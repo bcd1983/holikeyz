@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=com.elgato.RingLight
+Exec=/usr/local/bin/elgato-dbus-service
+SystemdService=elgato-ring-light.service

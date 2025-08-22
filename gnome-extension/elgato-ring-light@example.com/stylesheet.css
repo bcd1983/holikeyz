@@ -1,0 +1,161 @@
+/* Elgato Ring Light Extension Styles */
+
+.elgato-panel-button {
+    padding: 0 8px;
+}
+
+.elgato-menu {
+    width: 380px;
+    padding: 12px;
+}
+
+.elgato-header {
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+}
+
+.elgato-power-row {
+    spacing: 12px;
+}
+
+.elgato-power-icon {
+    icon-size: 20px;
+}
+
+.elgato-status-label {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-left: auto;
+}
+
+.elgato-control-section {
+    padding: 8px 12px;
+    margin: 8px 0;
+    background-color: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+}
+
+.elgato-slider-row {
+    spacing: 12px;
+    margin: 8px 0;
+}
+
+.elgato-slider-label {
+    min-width: 80px;
+    font-weight: 500;
+}
+
+.elgato-slider-value {
+    min-width: 45px;
+    text-align: right;
+    font-family: monospace;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Scene Grid Styles */
+.elgato-scenes-section {
+    padding: 12px 0;
+}
+
+.elgato-scenes-title {
+    font-weight: bold;
+    font-size: 13px;
+    margin-bottom: 12px;
+    padding: 0 12px;
+}
+
+.elgato-scenes-grid {
+    spacing: 8px;
+}
+
+.elgato-scene-row {
+    spacing: 8px;
+}
+
+.elgato-scene-button {
+    width: 174px;
+    height: 100px;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    background-color: rgba(255, 255, 255, 0.05);
+    transition: all 200ms ease;
+}
+
+.elgato-scene-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.elgato-scene-button:active,
+.elgato-scene-button.active {
+    border-color: #4CAF50;
+    background-color: rgba(76, 175, 80, 0.2);
+}
+
+.elgato-scene-content {
+    width: 170px;
+    height: 96px;
+    border-radius: 10px;
+    background-size: cover;
+    background-position: center;
+}
+
+.elgato-scene-overlay {
+    width: 170px;
+    height: 96px;
+    border-radius: 10px;
+    background: linear-gradient(to bottom, 
+        rgba(0, 0, 0, 0) 0%, 
+        rgba(0, 0, 0, 0.4) 60%, 
+        rgba(0, 0, 0, 0.7) 100%);
+    padding: 8px 12px;
+}
+
+.elgato-scene-info {
+    margin-top: auto;
+}
+
+.elgato-scene-name {
+    font-weight: bold;
+    font-size: 14px;
+    color: white;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.elgato-scene-description {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Quick Actions */
+.elgato-quick-actions {
+    padding: 8px 12px;
+    spacing: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 12px;
+}
+
+.elgato-action-button {
+    padding: 8px 12px;
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.elgato-action-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Animations */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+.elgato-connecting {
+    animation: pulse 2s infinite;
+}

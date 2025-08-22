@@ -1,0 +1,16 @@
+[Unit]
+Description=Elgato Ring Light D-Bus Service
+After=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=com.elgato.RingLight
+ExecStart=/usr/local/bin/elgato-dbus-service
+Restart=on-failure
+RestartSec=5
+Environment="RUST_LOG=info"
+Environment="ELGATO_IP=192.168.7.80"
+Environment="ELGATO_PORT=9123"
+
+[Install]
+WantedBy=default.target

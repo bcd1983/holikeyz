@@ -1,0 +1,31 @@
+# Elgato Ring Light Controller Configuration
+
+[device]
+# IP address of your Elgato Ring Light
+ip = "192.168.7.80"
+# Port (default is 9123)
+port = 9123
+
+[defaults]
+# Default brightness when turning on (0-100)
+brightness = 75
+# Default color temperature in Kelvin (2900-7000)
+temperature = 5000
+
+[scenes]
+# Custom scene definitions
+[scenes.morning]
+brightness = 80
+temperature = 5600
+
+[scenes.evening]
+brightness = 60
+temperature = 3200
+
+[scenes.focus]
+brightness = 90
+temperature = 6500
+
+[logging]
+# Log level: trace, debug, info, warn, error
+level = "info"

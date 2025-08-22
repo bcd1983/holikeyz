@@ -1,0 +1,8 @@
+{
+  "name": "Elgato Ring Light Controller",
+  "description": "Control your Elgato Ring Light from GNOME Shell",
+  "uuid": "elgato-ring-light@example.com",
+  "version": 1,
+  "shell-version": ["45", "46", "47", "48"],
+  "url": "https://github.com/yourusername/elgato-ring-light-controller"
+}
