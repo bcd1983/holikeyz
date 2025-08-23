@@ -1,0 +1,16 @@
+[Unit]
+Description=Holikeyz Ring Light D-Bus Service
+After=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=com.holikeyz.RingLight
+ExecStart=/usr/local/bin/holikeyz-service
+Restart=on-failure
+RestartSec=5
+Environment="RUST_LOG=info"
+Environment="RING_LIGHT_IP=192.168.7.80"
+Environment="RING_LIGHT_PORT=9123"
+
+[Install]
+WantedBy=default.target

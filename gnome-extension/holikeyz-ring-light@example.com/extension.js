@@ -10,11 +10,11 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as Slider from 'resource:///org/gnome/shell/ui/slider.js';
 
-const DBUS_NAME = 'com.elgato.RingLight';
-const DBUS_PATH = '/com/elgato/RingLight';
-const DBUS_INTERFACE = 'com.elgato.RingLight.Control';
+const DBUS_NAME = 'com.holikeyz.RingLight';
+const DBUS_PATH = '/com/holikeyz/RingLight';
+const DBUS_INTERFACE = 'com.holikeyz.RingLight.Control';
 
-const ElgatoDBusInterface = `
+const HolikeyzDBusInterface = `
 <node>
   <interface name="${DBUS_INTERFACE}">
     <method name="TurnOn">
@@ -52,7 +52,7 @@ const ElgatoDBusInterface = `
   </interface>
 </node>`;
 
-const ElgatoDBusProxy = Gio.DBusProxy.makeProxyWrapper(ElgatoDBusInterface);
+const HolikeyzDBusProxy = Gio.DBusProxy.makeProxyWrapper(HolikeyzDBusInterface);
 
 // Scene definitions
 const SCENES = [
@@ -112,10 +112,10 @@ const SCENES = [
     }
 ];
 
-const ElgatoIndicator = GObject.registerClass(
-class ElgatoIndicator extends PanelMenu.Button {
+const HolikeyzIndicator = GObject.registerClass(
+class HolikeyzIndicator extends PanelMenu.Button {
     _init() {
-        super._init(0.0, 'Elgato Ring Light');
+        super._init(0.0, 'Holikeyz Ring Light');
         
         this._isConnected = false;
         this._isOn = false;
@@ -148,7 +148,7 @@ class ElgatoIndicator extends PanelMenu.Button {
     }
     
     _loadStylesheet() {
-        let extensionPath = GLib.get_home_dir() + '/.local/share/gnome-shell/extensions/elgato-ring-light@example.com';
+        let extensionPath = GLib.get_home_dir() + '/.local/share/gnome-shell/extensions/holikeyz-ring-light@example.com';
         let stylesheetPath = extensionPath + '/stylesheet.css';
         let stylesheetFile = Gio.File.new_for_path(stylesheetPath);
         
@@ -499,7 +499,7 @@ class ElgatoIndicator extends PanelMenu.Button {
     
     _getSceneBackgroundStyle(scene) {
         // Check if image exists
-        let extensionPath = GLib.get_home_dir() + '/.local/share/gnome-shell/extensions/elgato-ring-light@example.com';
+        let extensionPath = GLib.get_home_dir() + '/.local/share/gnome-shell/extensions/holikeyz-ring-light@example.com';
         let imagePath = `${extensionPath}/images/${scene.id}.jpg`;
         let imageFile = Gio.File.new_for_path(imagePath);
         
@@ -543,13 +543,13 @@ class ElgatoIndicator extends PanelMenu.Button {
     
     _connectToDBus() {
         try {
-            this._proxy = new ElgatoDBusProxy(
+            this._proxy = new HolikeyzDBusProxy(
                 Gio.DBus.session,
                 DBUS_NAME,
                 DBUS_PATH,
                 (proxy, error) => {
                     if (error) {
-                        log(`Failed to connect to Elgato D-Bus service: ${error}`);
+                        log(`Failed to connect to Holikeyz D-Bus service: ${error}`);
                         this._setConnectionStatus(false);
                     } else {
                         this._setConnectionStatus(true);
@@ -691,14 +691,14 @@ class ElgatoIndicator extends PanelMenu.Button {
     }
 });
 
-export default class ElgatoExtension {
+export default class HolikeyzExtension {
     constructor() {
         this._indicator = null;
     }
     
     enable() {
-        this._indicator = new ElgatoIndicator();
-        Main.panel.addToStatusArea('elgato-indicator', this._indicator);
+        this._indicator = new HolikeyzIndicator();
+        Main.panel.addToStatusArea('holikeyz-indicator', this._indicator);
     }
     
     disable() {

@@ -1,37 +1,43 @@
 use anyhow::Result;
 use dbus::blocking::Connection;
 use dbus_crossroads::{Crossroads, IfaceBuilder};
-use elgato_controller::{ElgatoClient, models::LightState, error::ElgatoError};
-use std::sync::{Arc, Mutex, RwLock};
+use holikeyz::{RingLightClient, models::{LightState, AccessoryInfo, Settings}};
+use std::sync::{Arc, RwLock};
 use log::info;
 use tokio::runtime::Runtime;
 
-const DBUS_NAME: &str = "com.elgato.RingLight";
-const DBUS_PATH: &str = "/com/elgato/RingLight";
-const DBUS_INTERFACE: &str = "com.elgato.RingLight.Control";
+const DBUS_NAME: &str = "com.holikeyz.RingLight";
+const DBUS_PATH: &str = "/com/holikeyz/RingLight";
+const DBUS_INTERFACE: &str = "com.holikeyz.RingLight.Control";
 
 struct CachedState {
-    is_on: bool,
-    brightness: u8,
-    temperature: u16,
+    is_on: Vec<bool>,
+    brightness: Vec<u8>,
+    temperature: Vec<u16>,
+    accessory_info: Option<AccessoryInfo>,
+    settings: Option<Settings>,
+    num_lights: u8,
 }
 
 struct LightService {
-    client: Arc<ElgatoClient>,
+    client: Arc<RingLightClient>,
     runtime: Arc<Runtime>,
     cached_state: Arc<RwLock<CachedState>>,
 }
 
 impl LightService {
     fn new(ip: &str, port: u16) -> Self {
-        let client = ElgatoClient::new(ip, port);
+        let client = RingLightClient::new(ip, port);
         let runtime = Runtime::new().unwrap();
         
-        // Initialize with default state
+        // Initialize with default state for single light
         let cached_state = CachedState {
-            is_on: false,
-            brightness: 50,
-            temperature: 213,
+            is_on: vec![false],
+            brightness: vec![50],
+            temperature: vec![213],
+            accessory_info: None,
+            settings: None,
+            num_lights: 1,
         };
         
         let service = Self {
@@ -54,12 +60,28 @@ impl LightService {
         std::thread::spawn(move || {
             runtime.block_on(async {
                 if let Ok(response) = client.get_lights().await {
-                    if let Some(light) = response.lights.first() {
-                        let mut cache = cached_state.write().unwrap();
-                        cache.is_on = light.is_on();
-                        cache.brightness = light.brightness;
-                        cache.temperature = light.temperature;
+                    let mut cache = cached_state.write().unwrap();
+                    cache.num_lights = response.number_of_lights;
+                    cache.is_on.clear();
+                    cache.brightness.clear();
+                    cache.temperature.clear();
+                    
+                    for light in &response.lights {
+                        cache.is_on.push(light.is_on());
+                        cache.brightness.push(light.brightness);
+                        cache.temperature.push(light.temperature);
                     }
+                }
+                
+                // Also fetch accessory info and settings
+                if let Ok(info) = client.get_accessory_info().await {
+                    let mut cache = cached_state.write().unwrap();
+                    cache.accessory_info = Some(info);
+                }
+                
+                if let Ok(settings) = client.get_settings().await {
+                    let mut cache = cached_state.write().unwrap();
+                    cache.settings = Some(settings);
                 }
             });
         });

@@ -1,0 +1,8 @@
+{
+  "name": "Holikeyz Ring Light Controller",
+  "description": "Control your Ring Light from GNOME Shell (Holikeyz - unofficial open source controller)",
+  "uuid": "holikeyz-ring-light@example.com",
+  "version": 1,
+  "shell-version": ["45", "46", "47", "48"],
+  "url": "https://github.com/yourusername/holikeyz"
+}

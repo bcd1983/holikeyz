@@ -1,14 +1,14 @@
 use anyhow::Result;
 use dbus::blocking::Connection;
 use dbus_crossroads::{Crossroads, IfaceBuilder};
-use elgato_controller::{ElgatoClient, models::LightState, error::ElgatoError};
-use std::sync::{Arc, Mutex, RwLock};
+use holikeyz::{RingLightClient, models::LightState};
+use std::sync::{Arc, RwLock};
 use log::info;
 use tokio::runtime::Runtime;
 
-const DBUS_NAME: &str = "com.elgato.RingLight";
-const DBUS_PATH: &str = "/com/elgato/RingLight";
-const DBUS_INTERFACE: &str = "com.elgato.RingLight.Control";
+const DBUS_NAME: &str = "com.holikeyz.RingLight";
+const DBUS_PATH: &str = "/com/holikeyz/RingLight";
+const DBUS_INTERFACE: &str = "com.holikeyz.RingLight.Control";
 
 struct CachedState {
     is_on: bool,
@@ -17,14 +17,14 @@ struct CachedState {
 }
 
 struct LightService {
-    client: Arc<ElgatoClient>,
+    client: Arc<RingLightClient>,
     runtime: Arc<Runtime>,
     cached_state: Arc<RwLock<CachedState>>,
 }
 
 impl LightService {
     fn new(ip: &str, port: u16) -> Self {
-        let client = ElgatoClient::new(ip, port);
+        let client = RingLightClient::new(ip, port);
         let runtime = Runtime::new().unwrap();
         
         // Initialize with default state

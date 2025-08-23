@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ElgatoError {
+pub enum HolikeyzError {
     #[error("HTTP request failed: {0}")]
     RequestError(#[from] reqwest::Error),
     
@@ -27,4 +27,4 @@ pub enum ElgatoError {
     IoError(#[from] std::io::Error),
 }
 
-pub type Result<T> = std::result::Result<T, ElgatoError>;
+pub type Result<T> = std::result::Result<T, HolikeyzError>;

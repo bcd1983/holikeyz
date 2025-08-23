@@ -1,17 +1,18 @@
-use crate::{error::Result, models::LightInfo, ElgatoError};
+use crate::{error::Result, models::LightInfo, HolikeyzError};
 use mdns_sd::{ServiceDaemon, ServiceEvent};
 use std::collections::HashMap;
 use std::time::Duration;
 use log::{debug, info};
 
-const ELGATO_SERVICE: &str = "_elg._tcp.local.";
+// Using Elgato's mDNS service type for discovery (device compatibility)
+const RING_LIGHT_SERVICE: &str = "_elg._tcp.local.";
 
 pub async fn discover_lights(timeout: Duration) -> Result<Vec<LightInfo>> {
     let mdns = ServiceDaemon::new()
-        .map_err(|e| ElgatoError::DiscoveryError(e.to_string()))?;
+        .map_err(|e| HolikeyzError::DiscoveryError(e.to_string()))?;
     
-    let receiver = mdns.browse(ELGATO_SERVICE)
-        .map_err(|e| ElgatoError::DiscoveryError(e.to_string()))?;
+    let receiver = mdns.browse(RING_LIGHT_SERVICE)
+        .map_err(|e| HolikeyzError::DiscoveryError(e.to_string()))?;
     
     let mut lights = HashMap::new();
     let start = std::time::Instant::now();
@@ -30,7 +31,7 @@ pub async fn discover_lights(timeout: Duration) -> Result<Vec<LightInfo>> {
                         accessory_info: None,
                     };
                     
-                    info!("Discovered Elgato light: {} at {}:{}", 
+                    info!("Discovered Ring Light: {} at {}:{}", 
                           light_info.name, light_info.ip, light_info.port);
                     
                     lights.insert(info.get_fullname().to_string(), light_info);
@@ -52,7 +53,7 @@ pub async fn find_light_by_ip(ip: &str, port: u16) -> Result<LightInfo> {
     Ok(LightInfo {
         ip: ip.to_string(),
         port,
-        name: format!("elgato-light-{}", ip),
+        name: format!("ring-light-{}", ip),
         state: None,
         accessory_info: None,
     })

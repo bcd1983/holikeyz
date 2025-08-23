@@ -1,9 +1,9 @@
 [package]
-name = "elgato-controller"
+name = "holikeyz"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
-description = "Cross-platform Elgato Ring Light controller with GNOME integration"
+authors = ["Holikeyz Contributors"]
+description = "Unofficial open-source Ring Light controller with GNOME integration"
 license = "MIT"
 
 [dependencies]
@@ -20,18 +20,56 @@ mdns-sd = "0.11"
 dbus = "0.9"
 dbus-crossroads = "0.5"
 dbus-tokio = "0.7"
+network-interface = "2.0"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+hmac = "0.12"
+sha2 = "0.10"
+base64 = "0.21"
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+warp = "0.3"
+aes = "0.8"
+cbc = "0.1"
+cipher = "0.4"
+rand = "0.8"
+hex = "0.4"
+keyring = "2.0"
+rpassword = "7.3"
+dialoguer = "0.11"
+colored = "2.0"
+indicatif = "0.17"
 
 [lib]
-name = "elgato_controller"
+name = "holikeyz"
 path = "src/lib.rs"
 
 [[bin]]
-name = "elgato-cli"
+name = "holikeyz-cli"
 path = "src/bin/cli.rs"
 
 [[bin]]
-name = "elgato-dbus-service"
+name = "holikeyz-service"
 path = "src/bin/dbus_service.rs"
+
+[[bin]]
+name = "holikeyz-service-enhanced"
+path = "src/bin/dbus_service_enhanced.rs"
+
+[[bin]]
+name = "holikeyz-provisioning"
+path = "src/bin/provisioning_service.rs"
+
+[[bin]]
+name = "elgato-provisioner"
+path = "src/bin/elgato_provisioner.rs"
+
+[[bin]]
+name = "elgato-enhanced"
+path = "src/bin/elgato_enhanced.rs"
+
+[[bin]]
+name = "elgato-debug"
+path = "src/bin/elgato_debug.rs"
 
 [profile.release]
 strip = true

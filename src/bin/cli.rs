@@ -1,12 +1,12 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use elgato_controller::{ElgatoClient, discover_lights, models::*};
+use holikeyz::{RingLightClient, discover_lights, models::*};
 use env_logger;
 use std::time::Duration;
 
 #[derive(Parser)]
-#[command(name = "elgato-cli")]
-#[command(about = "Control Elgato Ring Light via command line", long_about = None)]
+#[command(name = "holikeyz-cli")]
+#[command(about = "Control Ring Light via command line (Holikeyz - unofficial open source controller)", long_about = None)]
 struct Cli {
     #[arg(short, long, default_value = "192.168.7.80")]
     ip: String,
@@ -98,11 +98,11 @@ async fn main() -> Result<()> {
     
     match cli.command {
         Commands::Discover { timeout } => {
-            println!("Discovering Elgato lights on the network...");
+            println!("Discovering Ring Lights on the network...");
             let lights = discover_lights(Duration::from_secs(timeout)).await?;
             
             if lights.is_empty() {
-                println!("No Elgato lights found on the network.");
+                println!("No Ring Lights found on the network.");
             } else {
                 println!("Found {} light(s):", lights.len());
                 for light in lights {
@@ -111,7 +111,7 @@ async fn main() -> Result<()> {
             }
         }
         _ => {
-            let client = ElgatoClient::new(&cli.ip, cli.port);
+            let client = RingLightClient::new(&cli.ip, cli.port);
             
             match cli.command {
                 Commands::On => {

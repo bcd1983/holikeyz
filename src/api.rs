@@ -3,12 +3,12 @@ use reqwest::{Client, StatusCode};
 use std::time::Duration;
 use log::{debug, info};
 
-pub struct ElgatoClient {
+pub struct RingLightClient {
     client: Client,
     base_url: String,
 }
 
-impl ElgatoClient {
+impl RingLightClient {
     pub fn new(ip: &str, port: u16) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_millis(500))  // Very aggressive timeout
@@ -22,7 +22,7 @@ impl ElgatoClient {
             
         Self {
             client,
-            base_url: format!("http://{}:{}/elgato", ip, port),
+            base_url: format!("http://{}:{}/elgato", ip, port), // API endpoint remains the same
         }
     }
     
@@ -36,7 +36,7 @@ impl ElgatoClient {
             .await?;
             
         if response.status() != StatusCode::OK {
-            return Err(crate::error::ElgatoError::DeviceNotFound(self.base_url.clone()));
+            return Err(crate::error::HolikeyzError::DeviceNotFound(self.base_url.clone()));
         }
         
         let light_response = response.json::<LightResponse>().await?;
@@ -60,7 +60,7 @@ impl ElgatoClient {
             .await?;
             
         if response.status() != StatusCode::OK {
-            return Err(crate::error::ElgatoError::DeviceNotFound(self.base_url.clone()));
+            return Err(crate::error::HolikeyzError::DeviceNotFound(self.base_url.clone()));
         }
         
         let light_response = response.json::<LightResponse>().await?;
@@ -94,7 +94,7 @@ impl ElgatoClient {
     
     pub async fn set_brightness(&self, brightness: u8) -> Result<LightResponse> {
         if brightness > 100 {
-            return Err(crate::error::ElgatoError::InvalidBrightness(brightness));
+            return Err(crate::error::HolikeyzError::InvalidBrightness(brightness));
         }
         
         // Quick optimization: use cached state if available
@@ -112,7 +112,7 @@ impl ElgatoClient {
     
     pub async fn set_temperature(&self, temperature: u16) -> Result<LightResponse> {
         if !(143..=344).contains(&temperature) {
-            return Err(crate::error::ElgatoError::InvalidTemperature(temperature));
+            return Err(crate::error::HolikeyzError::InvalidTemperature(temperature));
         }
         
         let mut current = self.get_lights().await?;
@@ -136,7 +136,7 @@ impl ElgatoClient {
             .await?;
             
         if response.status() != StatusCode::OK {
-            return Err(crate::error::ElgatoError::DeviceNotFound(self.base_url.clone()));
+            return Err(crate::error::HolikeyzError::DeviceNotFound(self.base_url.clone()));
         }
         
         let info = response.json::<AccessoryInfo>().await?;
@@ -154,7 +154,7 @@ impl ElgatoClient {
             .await?;
             
         if response.status() != StatusCode::OK {
-            return Err(crate::error::ElgatoError::DeviceNotFound(self.base_url.clone()));
+            return Err(crate::error::HolikeyzError::DeviceNotFound(self.base_url.clone()));
         }
         
         let settings = response.json::<Settings>().await?;
@@ -173,7 +173,7 @@ impl ElgatoClient {
             .await?;
             
         if response.status() != StatusCode::OK {
-            return Err(crate::error::ElgatoError::DeviceNotFound(self.base_url.clone()));
+            return Err(crate::error::HolikeyzError::DeviceNotFound(self.base_url.clone()));
         }
         
         let updated_settings = response.json::<Settings>().await?;
@@ -191,7 +191,7 @@ impl ElgatoClient {
             .await?;
             
         if response.status() != StatusCode::OK {
-            return Err(crate::error::ElgatoError::DeviceNotFound(self.base_url.clone()));
+            return Err(crate::error::HolikeyzError::DeviceNotFound(self.base_url.clone()));
         }
         
         info!("Light identified (should be flashing)");

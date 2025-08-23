@@ -1,10 +1,15 @@
-# Elgato Ring Light Controller
+# Holikeyz Ring Light Controller
 
-A cross-platform Rust application to control Elgato Ring Light devices with GNOME Shell integration.
+An unofficial, open-source Ring Light controller for Linux with GNOME integration. Control your ring light with a beautiful Philips Hue-inspired interface directly from your GNOME desktop.
+
+**Note:** This is an independent project and is not affiliated with, endorsed by, or associated with Elgato or Corsair in any way.
 
 ## Features
 
-- Complete control of all Elgato Ring Light settings
+- 🎨 Beautiful GNOME Shell extension with scene presets
+- 🎯 Ultra-low latency control (~50ms response time)
+- 🖼️ AI-generated scene thumbnails for visual selection
+- Complete control of all Ring Light settings
 - Command-line interface for scripting and automation
 - D-Bus service for system integration
 - GNOME Shell extension with panel indicator
@@ -25,8 +30,8 @@ A cross-platform Rust application to control Elgato Ring Light devices with GNOM
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/elgato-ring-light-controller
-cd elgato-ring-light-controller
+git clone https://github.com/yourusername/holikeyz
+cd holikeyz
 
 # Build the project
 make build
@@ -43,11 +48,11 @@ make install-extension
 Edit the systemd service file or set environment variables:
 
 ```bash
-export ELGATO_IP=192.168.7.80
-export ELGATO_PORT=9123
+export RING_LIGHT_IP=192.168.7.80
+export RING_LIGHT_PORT=9123
 ```
 
-Or modify `~/.config/systemd/user/elgato-ring-light.service`
+Or modify `~/.config/systemd/user/holikeyz-ring-light.service`
 
 ## Usage
 
@@ -55,29 +60,29 @@ Or modify `~/.config/systemd/user/elgato-ring-light.service`
 
 ```bash
 # Turn light on/off
-elgato-cli on
-elgato-cli off
-elgato-cli toggle
+holikeyz-cli on
+holikeyz-cli off
+holikeyz-cli toggle
 
 # Adjust brightness (0-100)
-elgato-cli brightness 75
+holikeyz-cli brightness 75
 
 # Set color temperature (2900-7000K)
-elgato-cli temperature 5600
+holikeyz-cli temperature 5600
 
 # Apply scene presets
-elgato-cli scene daylight
-elgato-cli scene warm
-elgato-cli scene video
+holikeyz-cli scene daylight
+holikeyz-cli scene warm
+holikeyz-cli scene video
 
 # Get current status
-elgato-cli status
+holikeyz-cli status
 
 # Discover lights on network
-elgato-cli discover
+holikeyz-cli discover
 
 # Make light flash for identification
-elgato-cli identify
+holikeyz-cli identify
 ```
 
 ### D-Bus Service
@@ -89,7 +94,7 @@ make enable-service
 ```
 
 The service exposes the following D-Bus interface:
-- `com.elgato.RingLight` at `/com/elgato/RingLight`
+- `com.holikeyz.RingLight` at `/com/holikeyz/RingLight`
 
 ### GNOME Shell Extension
 
@@ -102,7 +107,7 @@ The service exposes the following D-Bus interface:
 
 3. Enable the extension using GNOME Extensions app or:
    ```bash
-   gnome-extensions enable elgato-ring-light@example.com
+   gnome-extensions enable holikeyz-ring-light@example.com
    ```
 
 The extension provides:
@@ -114,7 +119,7 @@ The extension provides:
 
 ## API Endpoints
 
-The Elgato Ring Light exposes a REST API on port 9123:
+The Ring Light device exposes a REST API on port 9123:
 
 - `GET/PUT /elgato/lights` - Light state control
 - `GET /elgato/accessory-info` - Device information
@@ -126,7 +131,7 @@ The Elgato Ring Light exposes a REST API on port 9123:
 ### Project Structure
 
 ```
-elgato-ring-light-controller/
+holikeyz/
 ├── src/
 │   ├── lib.rs           # Core library
 │   ├── api.rs           # HTTP API client
@@ -149,7 +154,7 @@ elgato-ring-light-controller/
 cargo test
 
 # Test with specific IP
-elgato-cli --ip 192.168.1.100 status
+holikeyz-cli --ip 192.168.1.100 status
 ```
 
 ## Temperature Conversion
@@ -160,12 +165,12 @@ The library automatically converts between Kelvin (2900-7000K) and API values.
 ## Troubleshooting
 
 1. **Light not found**: Ensure the light is on the same network and the IP is correct
-2. **D-Bus service fails**: Check systemd logs: `journalctl --user -u elgato-ring-light`
+2. **D-Bus service fails**: Check systemd logs: `journalctl --user -u holikeyz-ring-light`
 3. **Extension not showing**: Restart GNOME Shell and check extension is enabled
 
 ## License
 
-MIT License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
@@ -173,3 +178,13 @@ Pull requests are welcome! Please ensure:
 - Code follows Rust best practices
 - Tests pass
 - Documentation is updated
+
+## Acknowledgments
+
+- Thanks to the Rust community for excellent async libraries
+- GNOME team for the extensible Shell architecture
+- AI image generation powered by Flux Schnell model
+
+## Disclaimer
+
+This is an unofficial, community-driven project. The developers of this software are not affiliated with Elgato, Corsair, or any other hardware manufacturer. Use at your own risk.

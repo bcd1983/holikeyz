@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=com.holikeyz.RingLight
+Exec=/usr/local/bin/holikeyz-service
+SystemdService=holikeyz-ring-light.service
