@@ -1,4 +1,4 @@
-# Holikeyz Ring Light Controller
+# Holikeyz (Elgato Ring Light Controller for Linux)
 
 An unofficial, open-source Ring Light controller for Linux, with native panel widgets for **KDE Plasma** and **GNOME Shell**. Talks to your light directly over the local network — no cloud, no vendor app required.
 
