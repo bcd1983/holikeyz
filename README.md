@@ -12,9 +12,8 @@ This project is provided **"AS IS"**, under the MIT license, for personal, educa
 
 ## Features
 
-- 🎨 Beautiful GNOME Shell extension with scene presets
-- 🎯 Ultra-low latency control (~50ms response time)
-- 🖼️ AI-generated scene thumbnails for visual selection
+- Beautiful GNOME Shell extension with scene presets
+- Ultra-low latency control (~50ms response time)
 - Complete control of all Ring Light settings
 - Command-line interface for scripting and automation
 - D-Bus service for system integration
@@ -189,7 +188,6 @@ Pull requests are welcome! Please ensure:
 
 - Thanks to the Rust community for excellent async libraries
 - GNOME team for the extensible Shell architecture
-- AI image generation powered by Flux Schnell model
 
 ## Disclaimer
 
