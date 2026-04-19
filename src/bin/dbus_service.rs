@@ -2,13 +2,48 @@ use anyhow::Result;
 use dbus::blocking::Connection;
 use dbus_crossroads::{Crossroads, IfaceBuilder};
 use holikeyz::{RingLightClient, models::{LightState, AccessoryInfo, Settings}};
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
-use log::info;
+use log::{info, warn};
 use tokio::runtime::Runtime;
 
 const DBUS_NAME: &str = "com.holikeyz.RingLight";
 const DBUS_PATH: &str = "/com/holikeyz/RingLight";
 const DBUS_INTERFACE: &str = "com.holikeyz.RingLight.Control";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ActiveLight {
+    ip: String,
+    port: u16,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct DiscoveredLight {
+    name: String,
+    ip: String,
+    port: u16,
+}
+
+fn active_config_path() -> PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    PathBuf::from(home).join(".config").join("holikeyz").join("active.json")
+}
+
+fn load_active() -> Option<ActiveLight> {
+    let path = active_config_path();
+    let text = std::fs::read_to_string(&path).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+fn save_active(active: &ActiveLight) -> Result<()> {
+    let path = active_config_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&path, serde_json::to_string_pretty(active)?)?;
+    Ok(())
+}
 
 struct CachedState {
     is_on: Vec<bool>,
@@ -20,7 +55,8 @@ struct CachedState {
 }
 
 struct LightService {
-    client: Arc<RingLightClient>,
+    client: Arc<RwLock<Arc<RingLightClient>>>,
+    active: Arc<RwLock<ActiveLight>>,
     runtime: Arc<Runtime>,
     cached_state: Arc<RwLock<CachedState>>,
 }
@@ -29,7 +65,7 @@ impl LightService {
     fn new(ip: &str, port: u16) -> Self {
         let client = RingLightClient::new(ip, port);
         let runtime = Runtime::new().unwrap();
-        
+
         // Initialize with default state for single light
         let cached_state = CachedState {
             is_on: vec![false],
@@ -39,21 +75,75 @@ impl LightService {
             settings: None,
             num_lights: 1,
         };
-        
+
         let service = Self {
-            client: Arc::new(client),
+            client: Arc::new(RwLock::new(Arc::new(client))),
+            active: Arc::new(RwLock::new(ActiveLight { ip: ip.to_string(), port })),
             runtime: Arc::new(runtime),
             cached_state: Arc::new(RwLock::new(cached_state)),
         };
-        
+
         // Fetch initial state asynchronously
         service.update_cached_state();
-        
+
         service
+    }
+
+    fn get_active_light(&self) -> (String, u16) {
+        let a = self.active.read().unwrap();
+        (a.ip.clone(), a.port)
+    }
+
+    fn set_active_light(&self, ip: String, port: u16) -> Result<bool> {
+        // Basic validation
+        if ip.trim().is_empty() {
+            anyhow::bail!("IP must not be empty");
+        }
+        let new_client = Arc::new(RingLightClient::new(&ip, port));
+        let new_active = ActiveLight { ip: ip.clone(), port };
+
+        {
+            let mut client_guard = self.client.write().unwrap();
+            *client_guard = new_client;
+        }
+        {
+            let mut active_guard = self.active.write().unwrap();
+            *active_guard = new_active.clone();
+        }
+
+        if let Err(e) = save_active(&new_active) {
+            warn!("failed to persist active light: {}", e);
+        } else {
+            info!("active light switched to {}:{}", ip, port);
+        }
+
+        // Refresh cached state against the new light
+        self.update_cached_state();
+        Ok(true)
+    }
+
+    fn discover(&self, timeout_secs: u32) -> Result<String> {
+        use std::time::Duration;
+        let timeout = Duration::from_secs(timeout_secs.max(1).min(30) as u64);
+        let runtime = self.runtime.clone();
+
+        let lights = std::thread::spawn(move || -> Vec<holikeyz::LightInfo> {
+            runtime.block_on(async move {
+                holikeyz::discover_lights(timeout).await.unwrap_or_default()
+            })
+        })
+        .join()
+        .map_err(|_| anyhow::anyhow!("discovery thread panicked"))?;
+
+        let simplified: Vec<DiscoveredLight> = lights
+            .into_iter()
+            .map(|l| DiscoveredLight { name: l.name, ip: l.ip, port: l.port })
+            .collect();
+        Ok(serde_json::to_string(&simplified)?)
     }
     
     fn update_cached_state(&self) {
-        let client = self.client.clone();
+        let client = self.client.read().unwrap().clone();
         let cached_state = self.cached_state.clone();
         let runtime = self.runtime.clone();
         
@@ -92,7 +182,7 @@ impl LightService {
     }
     
     fn turn_on_light(&self, light_index: Option<u8>) -> Result<bool> {
-        let client = self.client.clone();
+        let client = self.client.read().unwrap().clone();
         let cached_state = self.cached_state.clone();
         let runtime = self.runtime.clone();
         
@@ -137,7 +227,7 @@ impl LightService {
     }
     
     fn turn_off_light(&self, light_index: Option<u8>) -> Result<bool> {
-        let client = self.client.clone();
+        let client = self.client.read().unwrap().clone();
         let cached_state = self.cached_state.clone();
         let runtime = self.runtime.clone();
         
@@ -217,7 +307,7 @@ impl LightService {
             return Err(anyhow::anyhow!("Brightness must be 0-100"));
         }
         
-        let client = self.client.clone();
+        let client = self.client.read().unwrap().clone();
         let cached_state = self.cached_state.clone();
         let runtime = self.runtime.clone();
         
@@ -274,7 +364,7 @@ impl LightService {
             return Err(anyhow::anyhow!("Temperature must be 2900-7000K"));
         }
         
-        let client = self.client.clone();
+        let client = self.client.read().unwrap().clone();
         let cached_state = self.cached_state.clone();
         let runtime = self.runtime.clone();
         
@@ -367,7 +457,7 @@ impl LightService {
     }
     
     fn get_accessory_info(&self) -> Result<(String, String, String, u32, String, Vec<String>)> {
-        let client = self.client.clone();
+        let client = self.client.read().unwrap().clone();
         let cached_state = self.cached_state.clone();
         let runtime = self.runtime.clone();
         
@@ -408,7 +498,7 @@ impl LightService {
     }
     
     fn get_settings(&self) -> Result<(u8, u8, u32, u32, u32, u32)> {
-        let client = self.client.clone();
+        let client = self.client.read().unwrap().clone();
         let cached_state = self.cached_state.clone();
         let runtime = self.runtime.clone();
         
@@ -450,7 +540,7 @@ impl LightService {
     
     fn set_settings(&self, power_on_behavior: u8, power_on_brightness: u8, power_on_kelvin: u32,
                    switch_on_ms: u32, switch_off_ms: u32, color_change_ms: u32) -> Result<bool> {
-        let client = self.client.clone();
+        let client = self.client.read().unwrap().clone();
         let cached_state = self.cached_state.clone();
         let runtime = self.runtime.clone();
         
@@ -488,7 +578,7 @@ impl LightService {
     }
     
     fn identify(&self) -> Result<bool> {
-        let client = self.client.clone();
+        let client = self.client.read().unwrap().clone();
         let runtime = self.runtime.clone();
         
         // Fire and forget
@@ -512,7 +602,7 @@ impl LightService {
             _ => return Err(anyhow::anyhow!("Unknown scene: {}", scene)),
         };
         
-        let client = self.client.clone();
+        let client = self.client.read().unwrap().clone();
         let cached_state = self.cached_state.clone();
         let runtime = self.runtime.clone();
         
@@ -669,6 +759,23 @@ fn register_interface(cr: &mut Crossroads, _service: Arc<LightService>) -> dbus_
                 .map(|s| (s,))
                 .map_err(|e| dbus::MethodErr::failed(&e))
         });
+
+        // Light selection / discovery
+        b.method("Discover", ("timeout_secs",), ("lights_json",), |_, service, (timeout,): (u32,)| {
+            service.discover(timeout)
+                .map(|s| (s,))
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
+
+        b.method("GetActiveLight", (), ("ip", "port"), |_, service, _: ()| {
+            Ok(service.get_active_light())
+        });
+
+        b.method("SetActiveLight", ("ip", "port"), ("success",), |_, service, (ip, port): (String, u16)| {
+            service.set_active_light(ip, port)
+                .map(|s| (s,))
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
         
         // Properties (backward compatibility)
         b.property("IsOn")
@@ -712,14 +819,21 @@ fn register_interface(cr: &mut Crossroads, _service: Arc<LightService>) -> dbus_
 
 fn main() -> Result<()> {
     env_logger::init();
-    
-    let ip = std::env::var("RING_LIGHT_IP").unwrap_or_else(|_| "192.168.7.80".to_string());
-    let port = std::env::var("RING_LIGHT_PORT")
-        .ok()
-        .and_then(|p| p.parse::<u16>().ok())
-        .unwrap_or(9123);
-    
-    info!("Starting enhanced Holikeyz Ring Light D-Bus service");
+
+    // Priority: persisted active.json > env var > default
+    let (ip, port) = if let Some(saved) = load_active() {
+        info!("Loaded active light from {}", active_config_path().display());
+        (saved.ip, saved.port)
+    } else {
+        let ip = std::env::var("RING_LIGHT_IP").unwrap_or_else(|_| "192.168.7.80".to_string());
+        let port = std::env::var("RING_LIGHT_PORT")
+            .ok()
+            .and_then(|p| p.parse::<u16>().ok())
+            .unwrap_or(9123);
+        (ip, port)
+    };
+
+    info!("Starting Holikeyz Ring Light D-Bus service");
     info!("Connecting to light at {}:{}", ip, port);
     
     let service = Arc::new(LightService::new(&ip, port));

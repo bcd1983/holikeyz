@@ -20,7 +20,8 @@ MouseArea {
     Kirigami.Icon {
         anchors.fill: parent
         source: "im-light"
-        opacity: !root.connected ? 0.35
+        opacity: !root.connected ? 0.25
+               : !root.activeIp ? 0.4
                : root.isOn ? 1.0
                : 0.55
         Behavior on opacity { NumberAnimation { duration: 150 } }
@@ -32,10 +33,12 @@ MouseArea {
         width: Math.max(6, parent.width * 0.25)
         height: width
         radius: width / 2
-        color: root.connected ? (root.isOn ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.disabledTextColor)
-                              : Kirigami.Theme.negativeTextColor
+        color: !root.connected ? Kirigami.Theme.negativeTextColor
+             : !root.activeIp ? Kirigami.Theme.neutralTextColor
+             : root.isOn ? Kirigami.Theme.positiveTextColor
+                         : Kirigami.Theme.disabledTextColor
         border.color: Kirigami.Theme.backgroundColor
         border.width: 1
-        visible: compactRoot.containsMouse || !root.connected
+        visible: compactRoot.containsMouse || !root.connected || !root.activeIp
     }
 }

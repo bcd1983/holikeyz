@@ -5,14 +5,8 @@
       http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
     <kcfgfile name=""/>
     <group name="General">
-        <entry name="ip" type="String">
-            <default>192.168.6.80</default>
-        </entry>
-        <entry name="port" type="UInt">
-            <default>9123</default>
-        </entry>
         <entry name="pollInterval" type="UInt">
-            <default>5000</default>
+            <default>2000</default>
         </entry>
     </group>
 </kcfg>
