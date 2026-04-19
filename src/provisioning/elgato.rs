@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 use tokio::time::sleep;
-use rand::{RngCore, rngs::OsRng};
 
 use crate::provisioning::{
     DeviceInfo, WiFiNetwork, WiFiCredentials, ProvisioningRequest, 
@@ -214,7 +213,8 @@ impl ElgatoProvisioner {
         
         // Add 16-byte random prefix — use OS CSPRNG for crypto material
         let mut random_prefix = vec![0u8; 16];
-        OsRng.fill_bytes(&mut random_prefix);
+        getrandom::fill(&mut random_prefix)
+            .map_err(|e| anyhow::anyhow!("failed to read OS randomness: {}", e))?;
         
         // Combine random prefix with JSON data
         let mut data_to_encrypt = random_prefix;
@@ -236,17 +236,17 @@ impl ElgatoProvisioner {
         
         // Perform AES-256-CBC encryption
         use aes::Aes256;
-        use cbc::{Encryptor, cipher::{BlockEncryptMut, KeyIvInit}};
-        
+        use cbc::{Encryptor, cipher::{BlockModeEncrypt, KeyIvInit}};
+
         type Aes256CbcEnc = Encryptor<Aes256>;
-        
+
         let key_array: [u8; 32] = key_bytes.try_into()
             .map_err(|_| anyhow::anyhow!("Failed to convert key to array"))?;
         let iv_array: [u8; 16] = iv_bytes.try_into()
             .map_err(|_| anyhow::anyhow!("Failed to convert IV to array"))?;
-        
+
         let cipher = Aes256CbcEnc::new(&key_array.into(), &iv_array.into());
-        let encrypted = cipher.encrypt_padded_vec_mut::<cbc::cipher::block_padding::NoPadding>(&data_to_encrypt);
+        let encrypted = cipher.encrypt_padded_vec::<cbc::cipher::block_padding::NoPadding>(&data_to_encrypt);
         
         debug!("Encrypted {} bytes of WiFi credentials", encrypted.len());
         Ok(encrypted)

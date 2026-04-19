@@ -7,37 +7,37 @@ description = "Unofficial open-source Ring Light controller with GNOME integrati
 license = "MIT"
 
 [dependencies]
-reqwest = { version = "0.11", features = ["json", "blocking"] }
-tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.13", features = ["json", "blocking", "form"] }
+tokio = { version = "1.52", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-clap = { version = "4.4", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 log = "0.4"
-env_logger = "0.10"
-mdns-sd = "0.11"
+env_logger = "0.11"
+mdns-sd = "0.19"
 dbus = "0.9"
 dbus-crossroads = "0.5"
 dbus-tokio = "0.7"
 network-interface = "2.0"
-uuid = { version = "1.6", features = ["v4", "serde"] }
-hmac = "0.12"
-sha2 = "0.10"
-base64 = "0.21"
+uuid = { version = "1.23", features = ["v4", "serde"] }
+hmac = "0.13"
+sha2 = "0.11"
+base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
-warp = "0.3"
-aes = "0.8"
-cbc = "0.1"
-cipher = "0.4"
-rand = "0.8"
+warp = { version = "0.4", features = ["server"] }
+aes = "0.9"
+cbc = "0.2"
+cipher = { version = "0.5", features = ["block-padding", "alloc"] }
+getrandom = "0.3"
 hex = "0.4"
-keyring = "2.0"
-rpassword = "7.3"
-dialoguer = "0.11"
-colored = "2.0"
-indicatif = "0.17"
+keyring = "3.6"
+rpassword = "7.4"
+dialoguer = "0.12"
+colored = "3.1"
+indicatif = "0.18"
 
 [lib]
 name = "holikeyz"

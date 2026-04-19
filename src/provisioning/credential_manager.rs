@@ -86,7 +86,7 @@ impl CredentialManager {
     }
 
     pub fn clear_all(&self) -> Result<()> {
-        self.entry.delete_password()
+        self.entry.delete_credential()
             .context("Failed to clear credentials")?;
         info!("All credentials cleared from keyring");
         Ok(())
