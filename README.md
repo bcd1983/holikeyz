@@ -62,8 +62,8 @@ The daemon is session-bus auto-activated — calling any method on `com.holikeyz
 ### Build once
 
 ```bash
-git clone https://github.com/bcd1983/holikeyz-ring-light-controller
-cd holikeyz-ring-light-controller
+git clone https://github.com/bcd1983/holikeyz.git
+cd holikeyz
 cargo build --release
 ```
 
@@ -252,7 +252,7 @@ The Ring Light device exposes a REST API on port 9123 (Elgato-compatible):
 ## Project Structure
 
 ```
-holikeyz-ring-light-controller/
+holikeyz/
 ├── src/
 │   ├── lib.rs              # Library entry point
 │   ├── api.rs              # HTTP client for the device
