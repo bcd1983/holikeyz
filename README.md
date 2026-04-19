@@ -1,6 +1,8 @@
 # Holikeyz Ring Light Controller
 
-An unofficial, open-source Ring Light controller for Linux with GNOME integration. Control your ring light with a beautiful Philips Hue-inspired interface directly from your GNOME desktop.
+An unofficial, open-source Ring Light controller for Linux, with native panel widgets for **KDE Plasma** and **GNOME Shell**. Talks to your light directly over the local network — no cloud, no vendor app required.
+
+![architecture](https://img.shields.io/badge/status-personal%20project-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
 ## Legal & Reverse-Engineering Notice
 
@@ -8,134 +10,222 @@ This is an **independent, unofficial** project. It is **not affiliated with, end
 
 The device-side protocol constants and wire format used in `src/provisioning/` were derived by black-box interoperability analysis of a device the author lawfully owns, for the purpose of enabling that device to operate with non-vendor software. No vendor firmware, SDKs, or proprietary source code were decompiled, redistributed, or used in producing this project.
 
-This project is provided **"AS IS"**, under the MIT license, for personal, educational, and interoperability use. Use on networks or devices you do not own or have explicit permission to operate may violate local law — you are responsible for how you use it.
+This project is provided **"AS IS"**, under the MIT license, for personal, educational, and interoperability use.
 
 ## Features
 
-- Beautiful GNOME Shell extension with scene presets
-- Ultra-low latency control (~50ms response time)
-- Complete control of all Ring Light settings
-- Command-line interface for scripting and automation
-- D-Bus service for system integration
-- GNOME Shell extension with panel indicator
-- Scene presets (Daylight, Warm, Cool, Reading, Video)
-- Real-time brightness and color temperature adjustment
-- Device discovery via mDNS
-- Targets Linux + GNOME; Rust library is portable
+- **KDE Plasma 6 panel widget** with iOS-Philips-Hue-inspired UI, scene thumbnails, and in-popup light discovery.
+- **GNOME Shell extension** with panel indicator, sliders, and scene presets.
+- **Single D-Bus service** (`com.holikeyz.RingLight`) as the source of truth — any desktop frontend uses the same backend.
+- **Network discovery via mDNS** — find lights automatically.
+- **Command-line interface** for scripting / automation.
+- **Switchable active light**: pick from discovered lights at runtime; choice persists across service restarts.
+- **Scene presets**: Daylight, Warm, Cool, Reading, Video, Relax.
+- **Ultra-low-latency** HTTP client (~50ms toggle response).
+
+## Architecture
+
+```
+┌─────────────────────────┐     ┌─────────────────────────┐
+│  KDE plasmoid   /       │     │  holikeyz-cli           │
+│  GNOME extension        │     │  (terminal clients)     │
+└───────────┬─────────────┘     └────────────┬────────────┘
+            │        D-Bus (com.holikeyz.RingLight)        │
+            └──────────────┬────────────────┘
+                           ▼
+            ┌──────────────────────────────┐
+            │  holikeyz-service            │
+            │  (Rust daemon, session bus)  │
+            │  - state cache               │
+            │  - mDNS discovery            │
+            │  - active-light persistence  │
+            └──────────────┬───────────────┘
+                           │ HTTP / Elgato-compat API
+                           ▼
+                    ┌──────────────┐
+                    │  Ring Light  │
+                    │  (on LAN)    │
+                    └──────────────┘
+```
+
+The daemon is session-bus auto-activated — calling any method on `com.holikeyz.RingLight` starts it on demand; it shuts down with your session.
 
 ## Prerequisites
 
 - Rust 1.70+ and Cargo
-- For GNOME integration: GNOME Shell 45+
-- D-Bus (for Linux desktop integration)
+- KDE Plasma 6 (for the plasmoid) *or* GNOME Shell 45+ (for the extension)
+- `qdbus6` (ships with KDE/Qt 6) if you're using the plasmoid
+- `dbus-daemon` (any Linux desktop has it)
 
-## Installation
+## Install
 
-### Quick install
+### Build once
 
 ```bash
 git clone https://github.com/bcd1983/holikeyz-ring-light-controller
 cd holikeyz-ring-light-controller
+cargo build --release
+```
+
+That produces `target/release/holikeyz-cli`, `target/release/holikeyz-service`, and the provisioner binaries.
+
+### Install the D-Bus service
+
+Pick one: **user-level** (no sudo, recommended for a single-user desktop) or **system-wide**.
+
+#### User-level (no sudo)
+
+```bash
+# 1. Drop the binary into ~/.local/bin (make sure it's in your PATH).
+install -Dm755 target/release/holikeyz-service ~/.local/bin/holikeyz-service
+
+# 2. Register the session-bus service file so D-Bus auto-activates it.
+mkdir -p ~/.local/share/dbus-1/services
+cat > ~/.local/share/dbus-1/services/com.holikeyz.RingLight.service <<EOF
+[D-BUS Service]
+Name=com.holikeyz.RingLight
+Exec=$HOME/.local/bin/holikeyz-service
+EOF
+
+# 3. Tell the running session bus to rescan.
+dbus-send --session --type=method_call --dest=org.freedesktop.DBus \
+          /org/freedesktop/DBus org.freedesktop.DBus.ReloadConfig
+```
+
+The first D-Bus call (e.g., opening the plasmoid popup) will launch the service.
+
+#### System-wide (sudo)
+
+Use the bundled installer — it builds, installs binaries to `/usr/local/bin`, writes the D-Bus and systemd service files, and prompts for your light's IP:
+
+```bash
 ./install.sh
 ```
 
-The installer builds the project, installs the D-Bus service and GNOME extension, and prompts for your light's IP.
-
-### Manual install (via make)
+Or via `make`:
 
 ```bash
 make build
-sudo make install       # binaries + systemd + D-Bus service files
-make install-extension  # GNOME Shell extension
-make enable-service     # start the user D-Bus service
+sudo make install       # binaries + /usr/share/dbus-1/services entry
+make enable-service     # optional: systemd user unit for always-on
 ```
 
-### Configure the Ring Light IP
+### Install the desktop frontend
 
-Edit the systemd service file or set environment variables:
+#### KDE Plasma 6 plasmoid
 
 ```bash
-export RING_LIGHT_IP=192.168.7.80
-export RING_LIGHT_PORT=9123
+cd kde-plasmoid
+./install.sh            # runs kpackagetool6 -i or -u
 ```
 
-Or modify `~/.config/systemd/user/holikeyz-ring-light.service`
+Then: right-click your panel → **Add or Manage Widgets** → search "**Ring Light**" → drag it in.
+
+If the widget doesn't appear in the list, reload Plasma Shell:
+
+```bash
+kquitapp6 plasmashell && kstart plasmashell
+```
+
+#### GNOME Shell extension
+
+From repo root:
+
+```bash
+make install-extension
+gnome-extensions enable holikeyz-ring-light@example.com
+```
+
+Then restart GNOME Shell: Alt+F2 → type `r` → Enter (X11 only). On Wayland, log out and back in.
 
 ## Usage
 
-### Command Line Interface
+### CLI
+
+The CLI talks directly to the light's HTTP API — it does *not* go through the D-Bus service, so it works with or without the service running.
 
 ```bash
-# Turn light on/off
-holikeyz-cli on
-holikeyz-cli off
-holikeyz-cli toggle
-
-# Adjust brightness (0-100)
-holikeyz-cli brightness 75
-
-# Set color temperature (2900-7000K)
-holikeyz-cli temperature 5600
-
-# Apply scene presets
-holikeyz-cli scene daylight
-holikeyz-cli scene warm
-holikeyz-cli scene video
-
-# Get current status
-holikeyz-cli status
-
-# Discover lights on network
-holikeyz-cli discover
-
-# Make light flash for identification
-holikeyz-cli identify
+# --ip is required unless your light is at the default (192.168.7.80)
+holikeyz-cli --ip 192.168.6.80 discover
+holikeyz-cli --ip 192.168.6.80 status
+holikeyz-cli --ip 192.168.6.80 on
+holikeyz-cli --ip 192.168.6.80 off
+holikeyz-cli --ip 192.168.6.80 toggle
+holikeyz-cli --ip 192.168.6.80 brightness 75
+holikeyz-cli --ip 192.168.6.80 temperature 5600
+holikeyz-cli --ip 192.168.6.80 scene daylight    # daylight|warm|cool|reading|video|relax
+holikeyz-cli --ip 192.168.6.80 identify          # flash the light
 ```
 
-### D-Bus Service
+### D-Bus (for GUI clients / scripting)
 
-Enable and start the systemd service:
+The service exposes `com.holikeyz.RingLight` on the session bus at `/com/holikeyz/RingLight`, interface `com.holikeyz.RingLight.Control`.
 
 ```bash
-make enable-service
+# Discover lights on the network (returns a JSON string)
+qdbus6 com.holikeyz.RingLight /com/holikeyz/RingLight \
+       com.holikeyz.RingLight.Control.Discover 4
+
+# What's the currently active light?
+qdbus6 com.holikeyz.RingLight /com/holikeyz/RingLight \
+       com.holikeyz.RingLight.Control.GetActiveLight
+
+# Switch the active light
+qdbus6 com.holikeyz.RingLight /com/holikeyz/RingLight \
+       com.holikeyz.RingLight.Control.SetActiveLight 192.168.6.80 9123
+
+# State queries / mutations
+qdbus6 com.holikeyz.RingLight /com/holikeyz/RingLight \
+       com.holikeyz.RingLight.Control.GetStatus            # (bool, u8, u32)
+qdbus6 com.holikeyz.RingLight /com/holikeyz/RingLight \
+       com.holikeyz.RingLight.Control.TurnOn
+qdbus6 com.holikeyz.RingLight /com/holikeyz/RingLight \
+       com.holikeyz.RingLight.Control.SetBrightness 75
+qdbus6 com.holikeyz.RingLight /com/holikeyz/RingLight \
+       com.holikeyz.RingLight.Control.SetTemperature 5600
+qdbus6 com.holikeyz.RingLight /com/holikeyz/RingLight \
+       com.holikeyz.RingLight.Control.ApplyScene daylight
 ```
 
-The service exposes the following D-Bus interface:
-- `com.holikeyz.RingLight` at `/com/holikeyz/RingLight`
+Full method list is in `src/bin/dbus_service.rs` (`register_interface`).
 
-### GNOME Shell Extension
+### Configuring the active light
 
-1. Install the extension:
-   ```bash
-   make install-extension
-   ```
+The D-Bus service persists the active light to `~/.config/holikeyz/active.json`:
 
-2. Restart GNOME Shell (Alt+F2, type 'r', press Enter)
+```json
+{
+  "ip": "192.168.6.80",
+  "port": 9123
+}
+```
 
-3. Enable the extension using GNOME Extensions app or:
-   ```bash
-   gnome-extensions enable holikeyz-ring-light@example.com
-   ```
+Priority on startup: `active.json` → `RING_LIGHT_IP`/`RING_LIGHT_PORT` env vars → default (`192.168.7.80:9123`). The plasmoid's "Discover" button calls `SetActiveLight` which rewrites this file.
 
-The extension provides:
-- Panel indicator showing light status
-- Quick toggle switch
-- Brightness and temperature sliders
-- Scene presets menu
-- Light identification feature
+### systemd (optional)
 
-## API Endpoints
+If you want the service running constantly rather than D-Bus-activated on demand:
 
-The Ring Light device exposes a REST API on port 9123:
+```bash
+# User unit (recommended)
+cp systemd/holikeyz-ring-light.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now holikeyz-ring-light.service
+journalctl --user -u holikeyz-ring-light.service -f
+```
 
-- `GET/PUT /elgato/lights` - Light state control
-- `GET /elgato/accessory-info` - Device information
-- `GET/PUT /elgato/settings` - Device settings
-- `POST /elgato/identify` - Flash the light
+## API Reference (device)
 
-## Development
+The Ring Light device exposes a REST API on port 9123 (Elgato-compatible):
 
-### Project Structure
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` / `PUT` | `/elgato/lights` | Read / set on-off, brightness, temperature |
+| `GET` | `/elgato/accessory-info` | Model, firmware, serial |
+| `GET` / `PUT` | `/elgato/settings` | Power-on behavior, transition timings |
+| `POST` | `/elgato/identify` | Flash the light |
+
+## Project Structure
 
 ```
 holikeyz-ring-light-controller/
@@ -143,58 +233,51 @@ holikeyz-ring-light-controller/
 │   ├── lib.rs              # Library entry point
 │   ├── api.rs              # HTTP client for the device
 │   ├── discovery.rs        # mDNS discovery
-│   ├── models.rs           # Data structures
+│   ├── models.rs           # Data structures + temperature conversion
 │   ├── error.rs            # Error types
-│   ├── provisioning/       # Soft-AP onboarding for new devices
+│   ├── provisioning/       # Soft-AP onboarding for new-out-of-box devices
 │   └── bin/
-│       ├── cli.rs              # holikeyz-cli
-│       ├── dbus_service.rs     # holikeyz-service (GNOME backend)
-│       ├── provisioning_service.rs  # holikeyz-provisioning (local HTTP)
-│       ├── elgato_provisioner.rs    # elgato-provisioner
-│       └── elgato_enhanced.rs       # elgato-enhanced
-├── gnome-extension/   # GNOME Shell extension source
-├── systemd/           # Systemd user unit
-├── dbus/              # D-Bus service activation file
-├── examples/          # Example clients
-├── install.sh         # One-shot installer
-├── Makefile           # Build / install targets
+│       ├── cli.rs                  # holikeyz-cli
+│       ├── dbus_service.rs         # holikeyz-service (desktop backend)
+│       ├── provisioning_service.rs # holikeyz-provisioning (local HTTP)
+│       ├── elgato_provisioner.rs   # elgato-provisioner
+│       └── elgato_enhanced.rs      # elgato-enhanced
+├── kde-plasmoid/           # KDE Plasma 6 widget (QML)
+├── gnome-extension/        # GNOME Shell extension (JS)
+├── systemd/                # Optional systemd user unit
+├── dbus/                   # System-bus activation file (used by ./install.sh)
+├── examples/               # Example clients
+├── install.sh              # One-shot installer (sudo, system-wide)
+├── Makefile                # Build / install targets
 └── Cargo.toml
-```
-
-### Testing
-
-```bash
-# Run tests
-cargo test
-
-# Test with specific IP
-holikeyz-cli --ip 192.168.1.100 status
 ```
 
 ## Temperature Conversion
 
-The API uses internal values (143-344) for color temperature.
-The library automatically converts between Kelvin (2900-7000K) and API values.
+The device's API uses internal mired-like values (143–344) for color temperature. The library converts to/from Kelvin (2900–7000K) automatically; all public APIs (CLI, D-Bus, HTTP client) speak Kelvin.
 
 ## Troubleshooting
 
-1. **Light not found**: Ensure the light is on the same network and the IP is correct
-2. **D-Bus service fails**: Check systemd logs: `journalctl --user -u holikeyz-ring-light`
-3. **Extension not showing**: Restart GNOME Shell and check extension is enabled
+**Plasmoid says "Service offline"**
+- Check the service starts: `qdbus6 com.holikeyz.RingLight /com/holikeyz/RingLight com.holikeyz.RingLight.Control.GetActiveLight`
+- If you installed user-level, make sure `~/.local/bin/holikeyz-service` exists and is executable.
+- Run the binary directly to see logs: `RUST_LOG=info ~/.local/bin/holikeyz-service`
+
+**Plasmoid shows "No light selected"**
+- Click the wi-fi icon in the popup header → pick a light from the discovery list. Takes ~3 seconds.
+
+**"Discover" returns no lights**
+- Make sure the light is powered on and on the same Wi-Fi (mDNS doesn't cross VLANs / subnets).
+- Verify from the CLI: `holikeyz-cli discover` (bypasses the service).
+- Some Wi-Fi routers block mDNS / Bonjour by default — check "mDNS proxy" or "Bonjour" settings.
+
+**GNOME extension not showing**
+- On Wayland, a full log-out is required after enabling. Alt+F2 → `r` only works on X11.
+- Check journalctl: `journalctl --user -f /usr/bin/gnome-shell | grep -i holikeyz`
+
+**D-Bus service running in the wrong place**
+- Session bus activation tries system (`/usr/share/dbus-1/services/`) before user (`~/.local/share/dbus-1/services/`). If you have *both*, the system entry wins. Either remove the system one or make sure it points to the binary you want.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Pull requests are welcome! Please ensure:
-- Code follows Rust best practices
-- Tests pass
-- Documentation is updated
-
-## Acknowledgments
-
-- Thanks to the Rust community for excellent async libraries
-- GNOME team for the extensible Shell architecture
-
+MIT — see [LICENSE](LICENSE).
