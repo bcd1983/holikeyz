@@ -1,0 +1,17 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Id": "com.holikeyz.RingLight",
+        "Name": "Holikeyz Ring Light",
+        "Description": "Control your Elgato-compatible ring light from the Plasma panel",
+        "Icon": "im-light",
+        "Authors": [
+            { "Name": "Brian Dunphy", "Email": "brian@versos.ai" }
+        ],
+        "Version": "1.0",
+        "Category": "Utilities",
+        "License": "MIT",
+        "Website": "https://github.com/bcd1983/holikeyz-ring-light-controller"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
