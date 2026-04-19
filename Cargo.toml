@@ -52,10 +52,6 @@ name = "holikeyz-service"
 path = "src/bin/dbus_service.rs"
 
 [[bin]]
-name = "holikeyz-service-enhanced"
-path = "src/bin/dbus_service_enhanced.rs"
-
-[[bin]]
 name = "holikeyz-provisioning"
 path = "src/bin/provisioning_service.rs"
 
@@ -66,10 +62,6 @@ path = "src/bin/elgato_provisioner.rs"
 [[bin]]
 name = "elgato-enhanced"
 path = "src/bin/elgato_enhanced.rs"
-
-[[bin]]
-name = "elgato-debug"
-path = "src/bin/elgato_debug.rs"
 
 [profile.release]
 strip = true

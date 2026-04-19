@@ -88,6 +88,10 @@ impl LightService {
     }
     
     fn turn_on(&self) -> Result<bool> {
+        self.turn_on_light(None)
+    }
+    
+    fn turn_on_light(&self, light_index: Option<u8>) -> Result<bool> {
         let client = self.client.clone();
         let cached_state = self.cached_state.clone();
         let runtime = self.runtime.clone();
@@ -95,13 +99,33 @@ impl LightService {
         // Update cache immediately for responsiveness
         {
             let mut cache = cached_state.write().unwrap();
-            cache.is_on = true;
+            if let Some(idx) = light_index {
+                if (idx as usize) < cache.is_on.len() {
+                    cache.is_on[idx as usize] = true;
+                }
+            } else {
+                // Turn on all lights
+                for state in &mut cache.is_on {
+                    *state = true;
+                }
+            }
         }
         
         // Send command asynchronously
         std::thread::spawn(move || {
             runtime.block_on(async {
-                let _ = client.turn_on().await;
+                if let Some(idx) = light_index {
+                    // Turn on specific light
+                    if let Ok(mut response) = client.get_lights().await {
+                        if let Some(light) = response.lights.get_mut(idx as usize) {
+                            light.set_on(true);
+                            let _ = client.set_lights(light).await;
+                        }
+                    }
+                } else {
+                    // Turn on all lights
+                    let _ = client.turn_on().await;
+                }
             });
         });
         
@@ -109,6 +133,10 @@ impl LightService {
     }
     
     fn turn_off(&self) -> Result<bool> {
+        self.turn_off_light(None)
+    }
+    
+    fn turn_off_light(&self, light_index: Option<u8>) -> Result<bool> {
         let client = self.client.clone();
         let cached_state = self.cached_state.clone();
         let runtime = self.runtime.clone();
@@ -116,13 +144,33 @@ impl LightService {
         // Update cache immediately
         {
             let mut cache = cached_state.write().unwrap();
-            cache.is_on = false;
+            if let Some(idx) = light_index {
+                if (idx as usize) < cache.is_on.len() {
+                    cache.is_on[idx as usize] = false;
+                }
+            } else {
+                // Turn off all lights
+                for state in &mut cache.is_on {
+                    *state = false;
+                }
+            }
         }
         
         // Send command asynchronously
         std::thread::spawn(move || {
             runtime.block_on(async {
-                let _ = client.turn_off().await;
+                if let Some(idx) = light_index {
+                    // Turn off specific light
+                    if let Ok(mut response) = client.get_lights().await {
+                        if let Some(light) = response.lights.get_mut(idx as usize) {
+                            light.set_on(false);
+                            let _ = client.set_lights(light).await;
+                        }
+                    }
+                } else {
+                    // Turn off all lights
+                    let _ = client.turn_off().await;
+                }
             });
         });
         
@@ -132,7 +180,8 @@ impl LightService {
     fn toggle(&self) -> Result<bool> {
         let is_on = {
             let cache = self.cached_state.read().unwrap();
-            cache.is_on
+            // Check if any light is on
+            cache.is_on.iter().any(|&on| on)
         };
         
         if is_on {
@@ -142,7 +191,28 @@ impl LightService {
         }
     }
     
+    fn toggle_light(&self, light_index: u8) -> Result<bool> {
+        let is_on = {
+            let cache = self.cached_state.read().unwrap();
+            if (light_index as usize) < cache.is_on.len() {
+                cache.is_on[light_index as usize]
+            } else {
+                false
+            }
+        };
+        
+        if is_on {
+            self.turn_off_light(Some(light_index))
+        } else {
+            self.turn_on_light(Some(light_index))
+        }
+    }
+    
     fn set_brightness(&self, brightness: u8) -> Result<bool> {
+        self.set_brightness_light(brightness, None)
+    }
+    
+    fn set_brightness_light(&self, brightness: u8, light_index: Option<u8>) -> Result<bool> {
         if brightness > 100 {
             return Err(anyhow::anyhow!("Brightness must be 0-100"));
         }
@@ -152,21 +222,43 @@ impl LightService {
         let runtime = self.runtime.clone();
         
         // Get current state and update brightness
-        let (is_on, temperature) = {
+        let temperatures = {
             let mut cache = cached_state.write().unwrap();
-            cache.brightness = brightness;
-            cache.is_on = true;  // Turn on when adjusting
-            (cache.is_on, cache.temperature)
+            if let Some(idx) = light_index {
+                if (idx as usize) < cache.brightness.len() {
+                    cache.brightness[idx as usize] = brightness;
+                    cache.is_on[idx as usize] = true;
+                }
+            } else {
+                // Update all lights
+                for i in 0..cache.brightness.len() {
+                    cache.brightness[i] = brightness;
+                    cache.is_on[i] = true;
+                }
+            }
+            cache.temperature.clone()
         };
         
         // Send command asynchronously with current temperature
+        let light_idx = light_index;
         std::thread::spawn(move || {
             runtime.block_on(async {
-                let mut state = LightState::new();
-                state.set_on(true);
-                state.brightness = brightness;
-                state.temperature = temperature;
-                let _ = client.set_lights(&state).await;
+                if let Some(idx) = light_idx {
+                    if (idx as usize) < temperatures.len() {
+                        let mut state = LightState::new();
+                        state.set_on(true);
+                        state.brightness = brightness;
+                        state.temperature = temperatures[idx as usize];
+                        let _ = client.set_lights(&state).await;
+                    }
+                } else {
+                    // Set all lights
+                    let mut state = LightState::new();
+                    state.set_on(true);
+                    state.brightness = brightness;
+                    state.temperature = temperatures.first().copied().unwrap_or(213);
+                    let _ = client.set_lights(&state).await;
+                }
             });
         });
         
@@ -174,6 +266,10 @@ impl LightService {
     }
     
     fn set_temperature(&self, kelvin: u32) -> Result<bool> {
+        self.set_temperature_light(kelvin, None)
+    }
+    
+    fn set_temperature_light(&self, kelvin: u32, light_index: Option<u8>) -> Result<bool> {
         if !(2900..=7000).contains(&kelvin) {
             return Err(anyhow::anyhow!("Temperature must be 2900-7000K"));
         }
@@ -185,21 +281,43 @@ impl LightService {
         let api_temp = LightState::kelvin_to_api(kelvin);
         
         // Get current state and update temperature
-        let (is_on, brightness) = {
+        let brightnesses = {
             let mut cache = cached_state.write().unwrap();
-            cache.temperature = api_temp;
-            cache.is_on = true;  // Turn on when adjusting
-            (cache.is_on, cache.brightness)
+            if let Some(idx) = light_index {
+                if (idx as usize) < cache.temperature.len() {
+                    cache.temperature[idx as usize] = api_temp;
+                    cache.is_on[idx as usize] = true;
+                }
+            } else {
+                // Update all lights
+                for i in 0..cache.temperature.len() {
+                    cache.temperature[i] = api_temp;
+                    cache.is_on[i] = true;
+                }
+            }
+            cache.brightness.clone()
         };
         
         // Send command asynchronously with current brightness
+        let light_idx = light_index;
         std::thread::spawn(move || {
             runtime.block_on(async {
-                let mut state = LightState::new();
-                state.set_on(true);
-                state.brightness = brightness;
-                state.temperature = api_temp;
-                let _ = client.set_lights(&state).await;
+                if let Some(idx) = light_idx {
+                    if (idx as usize) < brightnesses.len() {
+                        let mut state = LightState::new();
+                        state.set_on(true);
+                        state.brightness = brightnesses[idx as usize];
+                        state.temperature = api_temp;
+                        let _ = client.set_lights(&state).await;
+                    }
+                } else {
+                    // Set all lights
+                    let mut state = LightState::new();
+                    state.set_on(true);
+                    state.brightness = brightnesses.first().copied().unwrap_or(50);
+                    state.temperature = api_temp;
+                    let _ = client.set_lights(&state).await;
+                }
             });
         });
         
@@ -207,13 +325,166 @@ impl LightService {
     }
     
     fn get_status(&self) -> Result<(bool, u8, u32)> {
-        // Return cached state immediately
+        // Return cached state immediately (first light for backward compatibility)
         let cache = self.cached_state.read().unwrap();
         Ok((
-            cache.is_on,
-            cache.brightness,
-            LightState::api_to_kelvin(cache.temperature)
+            cache.is_on.first().copied().unwrap_or(false),
+            cache.brightness.first().copied().unwrap_or(50),
+            LightState::api_to_kelvin(cache.temperature.first().copied().unwrap_or(213))
         ))
+    }
+    
+    fn get_num_lights(&self) -> Result<u8> {
+        let cache = self.cached_state.read().unwrap();
+        Ok(cache.num_lights)
+    }
+    
+    fn get_all_lights_status(&self) -> Result<(Vec<bool>, Vec<u8>, Vec<u32>)> {
+        let cache = self.cached_state.read().unwrap();
+        let temps_kelvin: Vec<u32> = cache.temperature.iter()
+            .map(|&t| LightState::api_to_kelvin(t))
+            .collect();
+        Ok((
+            cache.is_on.clone(),
+            cache.brightness.clone(),
+            temps_kelvin
+        ))
+    }
+    
+    fn get_light_status(&self, light_index: u8) -> Result<(bool, u8, u32)> {
+        let cache = self.cached_state.read().unwrap();
+        let idx = light_index as usize;
+        
+        if idx >= cache.num_lights as usize {
+            return Err(anyhow::anyhow!("Light index {} out of range", light_index));
+        }
+        
+        Ok((
+            cache.is_on.get(idx).copied().unwrap_or(false),
+            cache.brightness.get(idx).copied().unwrap_or(50),
+            LightState::api_to_kelvin(cache.temperature.get(idx).copied().unwrap_or(213))
+        ))
+    }
+    
+    fn get_accessory_info(&self) -> Result<(String, String, String, u32, String, Vec<String>)> {
+        let client = self.client.clone();
+        let cached_state = self.cached_state.clone();
+        let runtime = self.runtime.clone();
+        
+        // Try to get from cache first
+        {
+            let cache = cached_state.read().unwrap();
+            if let Some(ref info) = cache.accessory_info {
+                return Ok((
+                    info.product_name.clone(),
+                    info.firmware_version.clone(),
+                    info.serial_number.clone(),
+                    info.firmware_build_number,
+                    info.display_name.clone(),
+                    info.features.clone()
+                ));
+            }
+        }
+        
+        // Fetch if not cached
+        let info = runtime.block_on(async {
+            client.get_accessory_info().await
+        })?;
+        
+        // Update cache
+        {
+            let mut cache = cached_state.write().unwrap();
+            cache.accessory_info = Some(info.clone());
+        }
+        
+        Ok((
+            info.product_name,
+            info.firmware_version,
+            info.serial_number,
+            info.firmware_build_number,
+            info.display_name,
+            info.features
+        ))
+    }
+    
+    fn get_settings(&self) -> Result<(u8, u8, u32, u32, u32, u32)> {
+        let client = self.client.clone();
+        let cached_state = self.cached_state.clone();
+        let runtime = self.runtime.clone();
+        
+        // Try to get from cache first
+        {
+            let cache = cached_state.read().unwrap();
+            if let Some(ref settings) = cache.settings {
+                return Ok((
+                    settings.power_on_behavior,
+                    settings.power_on_brightness,
+                    LightState::api_to_kelvin(settings.power_on_temperature),
+                    settings.switch_on_duration_ms,
+                    settings.switch_off_duration_ms,
+                    settings.color_change_duration_ms
+                ));
+            }
+        }
+        
+        // Fetch if not cached
+        let settings = runtime.block_on(async {
+            client.get_settings().await
+        })?;
+        
+        // Update cache
+        {
+            let mut cache = cached_state.write().unwrap();
+            cache.settings = Some(settings.clone());
+        }
+        
+        Ok((
+            settings.power_on_behavior,
+            settings.power_on_brightness,
+            LightState::api_to_kelvin(settings.power_on_temperature),
+            settings.switch_on_duration_ms,
+            settings.switch_off_duration_ms,
+            settings.color_change_duration_ms
+        ))
+    }
+    
+    fn set_settings(&self, power_on_behavior: u8, power_on_brightness: u8, power_on_kelvin: u32,
+                   switch_on_ms: u32, switch_off_ms: u32, color_change_ms: u32) -> Result<bool> {
+        let client = self.client.clone();
+        let cached_state = self.cached_state.clone();
+        let runtime = self.runtime.clone();
+        
+        let settings = Settings {
+            power_on_behavior,
+            power_on_brightness,
+            power_on_temperature: LightState::kelvin_to_api(power_on_kelvin),
+            switch_on_duration_ms: switch_on_ms,
+            switch_off_duration_ms: switch_off_ms,
+            color_change_duration_ms: color_change_ms,
+        };
+        
+        // Update cache immediately
+        {
+            let mut cache = cached_state.write().unwrap();
+            cache.settings = Some(settings.clone());
+        }
+        
+        // Send command asynchronously
+        std::thread::spawn(move || {
+            runtime.block_on(async {
+                let _ = client.set_settings(&settings).await;
+            });
+        });
+        
+        Ok(true)
+    }
+    
+    fn set_power_on_settings(&self, behavior: u8, brightness: u8, kelvin: u32) -> Result<bool> {
+        // Get current settings
+        let (_, _, _, switch_on, switch_off, color_change) = self.get_settings()?;
+        
+        // Update only power-on related settings
+        self.set_settings(behavior, brightness, kelvin, switch_on, switch_off, color_change)
     }
     
     fn identify(&self) -> Result<bool> {
@@ -250,9 +521,11 @@ impl LightService {
         // Update cache immediately
         {
             let mut cache = cached_state.write().unwrap();
-            cache.is_on = true;
-            cache.brightness = brightness;
-            cache.temperature = api_temp;
+            for i in 0..cache.is_on.len() {
+                cache.is_on[i] = true;
+                cache.brightness[i] = brightness;
+                cache.temperature[i] = api_temp;
+            }
         }
         
         // Send command asynchronously
@@ -270,8 +543,9 @@ impl LightService {
     }
 }
 
-fn register_interface(cr: &mut Crossroads, service: Arc<LightService>) -> dbus_crossroads::IfaceToken<Arc<LightService>> {
+fn register_interface(cr: &mut Crossroads, _service: Arc<LightService>) -> dbus_crossroads::IfaceToken<Arc<LightService>> {
     cr.register(DBUS_INTERFACE, |b: &mut IfaceBuilder<Arc<LightService>>| {
+        // Basic controls
         b.method("TurnOn", (), ("success",), |_, service, _: ()| {
             service.turn_on()
                 .map(|s| (s,))
@@ -290,23 +564,100 @@ fn register_interface(cr: &mut Crossroads, service: Arc<LightService>) -> dbus_c
                 .map_err(|e| dbus::MethodErr::failed(&e))
         });
         
+        // Multi-light controls
+        b.method("TurnOnLight", ("light_index",), ("success",), |_, service, (light_index,): (u8,)| {
+            service.turn_on_light(Some(light_index))
+                .map(|s| (s,))
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
+        
+        b.method("TurnOffLight", ("light_index",), ("success",), |_, service, (light_index,): (u8,)| {
+            service.turn_off_light(Some(light_index))
+                .map(|s| (s,))
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
+        
+        b.method("ToggleLight", ("light_index",), ("success",), |_, service, (light_index,): (u8,)| {
+            service.toggle_light(light_index)
+                .map(|s| (s,))
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
+        
+        // Brightness controls
         b.method("SetBrightness", ("brightness",), ("success",), |_, service, (brightness,): (u8,)| {
             service.set_brightness(brightness)
                 .map(|s| (s,))
                 .map_err(|e| dbus::MethodErr::failed(&e))
         });
         
+        b.method("SetBrightnessLight", ("brightness", "light_index"), ("success",), |_, service, (brightness, light_index): (u8, u8)| {
+            service.set_brightness_light(brightness, Some(light_index))
+                .map(|s| (s,))
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
+        
+        // Temperature controls
         b.method("SetTemperature", ("kelvin",), ("success",), |_, service, (kelvin,): (u32,)| {
             service.set_temperature(kelvin)
                 .map(|s| (s,))
                 .map_err(|e| dbus::MethodErr::failed(&e))
         });
         
+        b.method("SetTemperatureLight", ("kelvin", "light_index"), ("success",), |_, service, (kelvin, light_index): (u32, u8)| {
+            service.set_temperature_light(kelvin, Some(light_index))
+                .map(|s| (s,))
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
+        
+        // Status methods
         b.method("GetStatus", (), ("is_on", "brightness", "temperature"), |_, service, _: ()| {
             service.get_status()
                 .map_err(|e| dbus::MethodErr::failed(&e))
         });
         
+        b.method("GetNumLights", (), ("num_lights",), |_, service, _: ()| {
+            service.get_num_lights()
+                .map(|n| (n,))
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
+        
+        b.method("GetAllLightsStatus", (), ("is_on_array", "brightness_array", "temperature_array"), |_, service, _: ()| {
+            service.get_all_lights_status()
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
+        
+        b.method("GetLightStatus", ("light_index",), ("is_on", "brightness", "temperature"), |_, service, (light_index,): (u8,)| {
+            service.get_light_status(light_index)
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
+        
+        // Accessory info
+        b.method("GetAccessoryInfo", (), ("product_name", "firmware_version", "serial_number", "firmware_build", "display_name", "features"), |_, service, _: ()| {
+            service.get_accessory_info()
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
+        
+        // Settings management
+        b.method("GetSettings", (), ("power_on_behavior", "power_on_brightness", "power_on_temperature", "switch_on_ms", "switch_off_ms", "color_change_ms"), |_, service, _: ()| {
+            service.get_settings()
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
+        
+        b.method("SetSettings", ("power_on_behavior", "power_on_brightness", "power_on_temperature", "switch_on_ms", "switch_off_ms", "color_change_ms"), ("success",), 
+            |_, service, (behavior, brightness, temp, on_ms, off_ms, color_ms): (u8, u8, u32, u32, u32, u32)| {
+            service.set_settings(behavior, brightness, temp, on_ms, off_ms, color_ms)
+                .map(|s| (s,))
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
+        
+        b.method("SetPowerOnSettings", ("behavior", "brightness", "temperature"), ("success",), 
+            |_, service, (behavior, brightness, temp): (u8, u8, u32)| {
+            service.set_power_on_settings(behavior, brightness, temp)
+                .map(|s| (s,))
+                .map_err(|e| dbus::MethodErr::failed(&e))
+        });
+        
+        // Other methods
         b.method("Identify", (), ("success",), |_, service, _: ()| {
             service.identify()
                 .map(|s| (s,))
@@ -319,6 +670,7 @@ fn register_interface(cr: &mut Crossroads, service: Arc<LightService>) -> dbus_c
                 .map_err(|e| dbus::MethodErr::failed(&e))
         });
         
+        // Properties (backward compatibility)
         b.property("IsOn")
             .get(|_, service| {
                 service.get_status()
@@ -349,19 +701,25 @@ fn register_interface(cr: &mut Crossroads, service: Arc<LightService>) -> dbus_c
                     .map(|_| Some(kelvin))
                     .map_err(|e| dbus::MethodErr::failed(&e))
             });
+        
+        b.property("NumLights")
+            .get(|_, service| {
+                service.get_num_lights()
+                    .map_err(|e| dbus::MethodErr::failed(&e))
+            });
     })
 }
 
 fn main() -> Result<()> {
     env_logger::init();
     
-    let ip = std::env::var("ELGATO_IP").unwrap_or_else(|_| "192.168.7.80".to_string());
-    let port = std::env::var("ELGATO_PORT")
+    let ip = std::env::var("RING_LIGHT_IP").unwrap_or_else(|_| "192.168.7.80".to_string());
+    let port = std::env::var("RING_LIGHT_PORT")
         .ok()
         .and_then(|p| p.parse::<u16>().ok())
         .unwrap_or(9123);
     
-    info!("Starting optimized Elgato Ring Light D-Bus service");
+    info!("Starting enhanced Holikeyz Ring Light D-Bus service");
     info!("Connecting to light at {}:{}", ip, port);
     
     let service = Arc::new(LightService::new(&ip, port));

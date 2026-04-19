@@ -21,7 +21,7 @@ This project is provided **"AS IS"**, under the MIT license, for personal, educa
 - Scene presets (Daylight, Warm, Cool, Reading, Video)
 - Real-time brightness and color temperature adjustment
 - Device discovery via mDNS
-- Cross-platform support (Linux, macOS, Windows)
+- Targets Linux + GNOME; Rust library is portable
 
 ## Prerequisites
 
@@ -31,21 +31,23 @@ This project is provided **"AS IS"**, under the MIT license, for personal, educa
 
 ## Installation
 
-### Build from source
+### Quick install
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/holikeyz
-cd holikeyz
+git clone https://github.com/bcd1983/holikeyz-ring-light-controller
+cd holikeyz-ring-light-controller
+./install.sh
+```
 
-# Build the project
+The installer builds the project, installs the D-Bus service and GNOME extension, and prompts for your light's IP.
+
+### Manual install (via make)
+
+```bash
 make build
-
-# Install binaries and services
-sudo make install
-
-# Install GNOME extension
-make install-extension
+sudo make install       # binaries + systemd + D-Bus service files
+make install-extension  # GNOME Shell extension
+make enable-service     # start the user D-Bus service
 ```
 
 ### Configure the Ring Light IP
@@ -136,20 +138,27 @@ The Ring Light device exposes a REST API on port 9123:
 ### Project Structure
 
 ```
-holikeyz/
+holikeyz-ring-light-controller/
 ├── src/
-│   ├── lib.rs           # Core library
-│   ├── api.rs           # HTTP API client
-│   ├── models.rs        # Data structures
-│   ├── discovery.rs     # mDNS discovery
-│   ├── error.rs         # Error handling
+│   ├── lib.rs              # Library entry point
+│   ├── api.rs              # HTTP client for the device
+│   ├── discovery.rs        # mDNS discovery
+│   ├── models.rs           # Data structures
+│   ├── error.rs            # Error types
+│   ├── provisioning/       # Soft-AP onboarding for new devices
 │   └── bin/
-│       ├── cli.rs       # CLI application
-│       └── dbus_service.rs # D-Bus service
-├── gnome-extension/     # GNOME Shell extension
-├── systemd/            # Systemd service files
-├── dbus/              # D-Bus service files
-└── Cargo.toml         # Rust dependencies
+│       ├── cli.rs              # holikeyz-cli
+│       ├── dbus_service.rs     # holikeyz-service (GNOME backend)
+│       ├── provisioning_service.rs  # holikeyz-provisioning (local HTTP)
+│       ├── elgato_provisioner.rs    # elgato-provisioner
+│       └── elgato_enhanced.rs       # elgato-enhanced
+├── gnome-extension/   # GNOME Shell extension source
+├── systemd/           # Systemd user unit
+├── dbus/              # D-Bus service activation file
+├── examples/          # Example clients
+├── install.sh         # One-shot installer
+├── Makefile           # Build / install targets
+└── Cargo.toml
 ```
 
 ### Testing
@@ -189,6 +198,3 @@ Pull requests are welcome! Please ensure:
 - Thanks to the Rust community for excellent async libraries
 - GNOME team for the extensible Shell architecture
 
-## Disclaimer
-
-This is an unofficial, community-driven project. The developers of this software are not affiliated with Elgato, Corsair, or any other hardware manufacturer. Use at your own risk.
