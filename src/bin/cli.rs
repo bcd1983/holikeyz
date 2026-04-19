@@ -1,6 +1,6 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use holikeyz::{RingLightClient, discover_lights, models::*};
+use holikeyz::{RingLightClient, discover_lights, models::*, resolve_active};
 use env_logger;
 use std::time::Duration;
 
@@ -8,14 +8,25 @@ use std::time::Duration;
 #[command(name = "holikeyz-cli")]
 #[command(about = "Control Ring Light via command line (Holikeyz - unofficial open source controller)", long_about = None)]
 struct Cli {
-    #[arg(short, long, default_value = "192.168.7.80")]
-    ip: String,
-    
-    #[arg(short, long, default_value = "9123")]
-    port: u16,
-    
+    /// Light IP address. Falls back to ~/.config/holikeyz/active.json or $RING_LIGHT_IP.
+    #[arg(short, long)]
+    ip: Option<String>,
+
+    /// Light port (protocol default 9123).
+    #[arg(short, long)]
+    port: Option<u16>,
+
     #[command(subcommand)]
     command: Commands,
+}
+
+fn build_client(ip: Option<&str>, port: Option<u16>) -> Result<RingLightClient> {
+    let active = resolve_active(ip, port).context(
+        "No Ring Light configured. Run `holikeyz-cli discover` to find one, \
+         then pass --ip <ip>, or set RING_LIGHT_IP, or select one from the \
+         KDE plasmoid / GNOME extension (which persists to ~/.config/holikeyz/active.json).",
+    )?;
+    Ok(RingLightClient::new(&active.ip, active.port))
 }
 
 #[derive(Subcommand)]
@@ -111,7 +122,7 @@ async fn main() -> Result<()> {
             }
         }
         _ => {
-            let client = RingLightClient::new(&cli.ip, cli.port);
+            let client = build_client(cli.ip.as_deref(), cli.port)?;
             
             match cli.command {
                 Commands::On => {

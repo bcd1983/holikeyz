@@ -144,17 +144,39 @@ Then restart GNOME Shell: Alt+F2 → type `r` → Enter (X11 only). On Wayland, 
 
 The CLI talks directly to the light's HTTP API — it does *not* go through the D-Bus service, so it works with or without the service running.
 
+**Finding your light's IP.** First time you run it on a new network:
+
 ```bash
-# --ip is required unless your light is at the default (192.168.7.80)
-holikeyz-cli --ip 192.168.6.80 discover
+holikeyz-cli discover            # no --ip needed
+# Found 1 light(s):
+#   - Elgato Ring Light ADD0._elg._tcp.local. at 192.168.6.80:9123
+```
+
+**Picking which light to control.** In order of priority, the CLI uses:
+
+1. `--ip <ip>` on the command line
+2. `~/.config/holikeyz/active.json` (written by the KDE plasmoid's Discover UI or the D-Bus service)
+3. `$RING_LIGHT_IP` / `$RING_LIGHT_PORT` environment variables
+
+If none of these are set, you get a clear error telling you what to do — there is **no hardcoded fallback IP** because home networks don't share one.
+
+```bash
+# One-off (no persistence)
 holikeyz-cli --ip 192.168.6.80 status
-holikeyz-cli --ip 192.168.6.80 on
-holikeyz-cli --ip 192.168.6.80 off
-holikeyz-cli --ip 192.168.6.80 toggle
-holikeyz-cli --ip 192.168.6.80 brightness 75
-holikeyz-cli --ip 192.168.6.80 temperature 5600
-holikeyz-cli --ip 192.168.6.80 scene daylight    # daylight|warm|cool|reading|video|relax
-holikeyz-cli --ip 192.168.6.80 identify          # flash the light
+
+# After running discovery and picking a light via the plasmoid, no flag needed
+holikeyz-cli status
+holikeyz-cli on
+holikeyz-cli off
+holikeyz-cli toggle
+holikeyz-cli brightness 75
+holikeyz-cli temperature 5600
+holikeyz-cli scene daylight    # daylight|warm|cool|reading|video|relax
+holikeyz-cli identify          # flash the light
+
+# Or stick it in your shell profile
+export RING_LIGHT_IP=192.168.6.80
+holikeyz-cli toggle
 ```
 
 ### D-Bus (for GUI clients / scripting)
@@ -191,7 +213,7 @@ Full method list is in `src/bin/dbus_service.rs` (`register_interface`).
 
 ### Configuring the active light
 
-The D-Bus service persists the active light to `~/.config/holikeyz/active.json`:
+The D-Bus service and the CLI share a single config file at `~/.config/holikeyz/active.json`:
 
 ```json
 {
@@ -200,7 +222,9 @@ The D-Bus service persists the active light to `~/.config/holikeyz/active.json`:
 }
 ```
 
-Priority on startup: `active.json` → `RING_LIGHT_IP`/`RING_LIGHT_PORT` env vars → default (`192.168.7.80:9123`). The plasmoid's "Discover" button calls `SetActiveLight` which rewrites this file.
+Resolution order (both CLI and service): `active.json` → `RING_LIGHT_IP`/`RING_LIGHT_PORT` env vars. If nothing is set, the **service starts anyway** with no active light — `GetActiveLight` returns `("", 0)` and any control method returns `no active light — call Discover then SetActiveLight`. The plasmoid's Discover button picks a light and calls `SetActiveLight`, which rewrites `active.json` for everyone to use.
+
+There is no hardcoded fallback IP; light addresses depend on your LAN's DHCP, so guessing would only cause confusion. Either run discovery or point the tool at your light explicitly.
 
 ### systemd (optional)
 
@@ -268,8 +292,11 @@ The device's API uses internal mired-like values (143–344) for color temperatu
 
 **"Discover" returns no lights**
 - Make sure the light is powered on and on the same Wi-Fi (mDNS doesn't cross VLANs / subnets).
-- Verify from the CLI: `holikeyz-cli discover` (bypasses the service).
+- Verify from the CLI: `holikeyz-cli discover` (bypasses the service and needs no IP).
 - Some Wi-Fi routers block mDNS / Bonjour by default — check "mDNS proxy" or "Bonjour" settings.
+
+**CLI says "No Ring Light configured"**
+- You haven't run discovery yet. `holikeyz-cli discover` to find the IP, then either `holikeyz-cli --ip <ip> ...`, `export RING_LIGHT_IP=<ip>`, or use the plasmoid / GNOME extension (both persist your choice).
 
 **GNOME extension not showing**
 - On Wayland, a full log-out is required after enabling. Alt+F2 → `r` only works on X11.
