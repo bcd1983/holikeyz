@@ -26,18 +26,85 @@ const HolikeyzDBusInterface = `
     <method name="Toggle">
       <arg type="b" direction="out" name="success"/>
     </method>
+    <method name="TurnOnLight">
+      <arg type="y" direction="in" name="light_index"/>
+      <arg type="b" direction="out" name="success"/>
+    </method>
+    <method name="TurnOffLight">
+      <arg type="y" direction="in" name="light_index"/>
+      <arg type="b" direction="out" name="success"/>
+    </method>
+    <method name="ToggleLight">
+      <arg type="y" direction="in" name="light_index"/>
+      <arg type="b" direction="out" name="success"/>
+    </method>
     <method name="SetBrightness">
       <arg type="y" direction="in" name="brightness"/>
+      <arg type="b" direction="out" name="success"/>
+    </method>
+    <method name="SetBrightnessLight">
+      <arg type="y" direction="in" name="brightness"/>
+      <arg type="y" direction="in" name="light_index"/>
       <arg type="b" direction="out" name="success"/>
     </method>
     <method name="SetTemperature">
       <arg type="u" direction="in" name="kelvin"/>
       <arg type="b" direction="out" name="success"/>
     </method>
+    <method name="SetTemperatureLight">
+      <arg type="u" direction="in" name="kelvin"/>
+      <arg type="y" direction="in" name="light_index"/>
+      <arg type="b" direction="out" name="success"/>
+    </method>
     <method name="GetStatus">
       <arg type="b" direction="out" name="is_on"/>
       <arg type="y" direction="out" name="brightness"/>
       <arg type="u" direction="out" name="temperature"/>
+    </method>
+    <method name="GetNumLights">
+      <arg type="y" direction="out" name="num_lights"/>
+    </method>
+    <method name="GetAllLightsStatus">
+      <arg type="ab" direction="out" name="is_on_array"/>
+      <arg type="ay" direction="out" name="brightness_array"/>
+      <arg type="au" direction="out" name="temperature_array"/>
+    </method>
+    <method name="GetLightStatus">
+      <arg type="y" direction="in" name="light_index"/>
+      <arg type="b" direction="out" name="is_on"/>
+      <arg type="y" direction="out" name="brightness"/>
+      <arg type="u" direction="out" name="temperature"/>
+    </method>
+    <method name="GetAccessoryInfo">
+      <arg type="s" direction="out" name="product_name"/>
+      <arg type="s" direction="out" name="firmware_version"/>
+      <arg type="s" direction="out" name="serial_number"/>
+      <arg type="u" direction="out" name="firmware_build"/>
+      <arg type="s" direction="out" name="display_name"/>
+      <arg type="as" direction="out" name="features"/>
+    </method>
+    <method name="GetSettings">
+      <arg type="y" direction="out" name="power_on_behavior"/>
+      <arg type="y" direction="out" name="power_on_brightness"/>
+      <arg type="u" direction="out" name="power_on_temperature"/>
+      <arg type="u" direction="out" name="switch_on_ms"/>
+      <arg type="u" direction="out" name="switch_off_ms"/>
+      <arg type="u" direction="out" name="color_change_ms"/>
+    </method>
+    <method name="SetSettings">
+      <arg type="y" direction="in" name="power_on_behavior"/>
+      <arg type="y" direction="in" name="power_on_brightness"/>
+      <arg type="u" direction="in" name="power_on_temperature"/>
+      <arg type="u" direction="in" name="switch_on_ms"/>
+      <arg type="u" direction="in" name="switch_off_ms"/>
+      <arg type="u" direction="in" name="color_change_ms"/>
+      <arg type="b" direction="out" name="success"/>
+    </method>
+    <method name="SetPowerOnSettings">
+      <arg type="y" direction="in" name="behavior"/>
+      <arg type="y" direction="in" name="brightness"/>
+      <arg type="u" direction="in" name="temperature"/>
+      <arg type="b" direction="out" name="success"/>
     </method>
     <method name="Identify">
       <arg type="b" direction="out" name="success"/>
@@ -49,662 +116,606 @@ const HolikeyzDBusInterface = `
     <property name="IsOn" type="b" access="read"/>
     <property name="Brightness" type="y" access="readwrite"/>
     <property name="Temperature" type="u" access="readwrite"/>
+    <property name="NumLights" type="y" access="read"/>
   </interface>
-</node>`;
+</node>
+`;
 
 const HolikeyzDBusProxy = Gio.DBusProxy.makeProxyWrapper(HolikeyzDBusInterface);
 
-// Scene definitions
-const SCENES = [
-    {
-        id: 'daylight',
-        name: 'Daylight',
-        description: 'Bright & Focused',
-        brightness: 80,
-        temperature: 5600,
-        icon: 'weather-clear-symbolic',
-        color: '#FFE4B5'
-    },
-    {
-        id: 'warm',
-        name: 'Warm',
-        description: 'Cozy Evening',
-        brightness: 60,
-        temperature: 3200,
-        icon: 'weather-sunset-symbolic',
-        color: '#FFA500'
-    },
-    {
-        id: 'cool',
-        name: 'Cool',
-        description: 'Modern & Crisp',
-        brightness: 70,
-        temperature: 6500,
-        icon: 'weather-snow-symbolic',
-        color: '#E0FFFF'
-    },
-    {
-        id: 'reading',
-        name: 'Reading',
-        description: 'Perfect for Focus',
-        brightness: 90,
-        temperature: 4500,
-        icon: 'accessories-text-editor-symbolic',
-        color: '#FFFACD'
-    },
-    {
-        id: 'video',
-        name: 'Video',
-        description: 'Content Creation',
-        brightness: 75,
-        temperature: 5000,
-        icon: 'camera-video-symbolic',
-        color: '#F0F8FF'
-    },
-    {
-        id: 'relax',
-        name: 'Relax',
-        description: 'Wind Down',
-        brightness: 40,
-        temperature: 2900,
-        icon: 'night-light-symbolic',
-        color: '#FFB6C1'
-    }
+// Scene presets with their settings
+const SCENE_PRESETS = [
+    { id: 'daylight', name: 'Daylight', icon: '☀️', brightness: 80, temperature: 5600 },
+    { id: 'warm', name: 'Warm', icon: '🕯️', brightness: 60, temperature: 3200 },
+    { id: 'cool', name: 'Cool', icon: '❄️', brightness: 70, temperature: 6500 },
+    { id: 'reading', name: 'Reading', icon: '📖', brightness: 90, temperature: 4500 },
+    { id: 'video', name: 'Video', icon: '🎥', brightness: 75, temperature: 5000 },
+    { id: 'relax', name: 'Relax', icon: '😌', brightness: 40, temperature: 2900 },
 ];
 
-const HolikeyzIndicator = GObject.registerClass(
-class HolikeyzIndicator extends PanelMenu.Button {
+const RingLightIndicator = GObject.registerClass(
+class RingLightIndicator extends PanelMenu.Button {
     _init() {
-        super._init(0.0, 'Holikeyz Ring Light');
+        super._init(0.0, 'Ring Light Controller');
         
-        this._isConnected = false;
+        // Initialize properties
+        this._dbusProxy = null;
         this._isOn = false;
         this._brightness = 50;
         this._temperature = 4500;
+        this._numLights = 1;
         this._currentScene = null;
-        this._sceneButtons = new Map();
+        this._sliderUpdateTimeout = null;
+        this._ignoreSliderUpdate = false;
+        this._lightItems = [];
         
-        // Panel icon
-        let icon = new St.Icon({
-            icon_name: 'weather-clear-symbolic',
-            style_class: 'system-status-icon elgato-panel-button',
+        // Create panel icon
+        let box = new St.BoxLayout({ style_class: 'panel-status-menu-box' });
+        this._icon = new St.Icon({
+            icon_name: 'dialog-information-symbolic',
+            style_class: 'system-status-icon',
         });
-        this.add_child(icon);
-        this._icon = icon;
+        box.add_child(this._icon);
+        this.add_child(box);
         
-        // Load stylesheet
-        this._loadStylesheet();
+        // Connect to D-Bus
+        this._connectToDbus();
         
         // Build menu
         this._buildMenu();
         
-        // Connect to D-Bus
-        this._connectToDBus();
-        
-        // Cleanup on destroy
-        this.connect('destroy', () => {
-            this._onDestroy();
-        });
+        // Initial status update
+        this._updateStatus();
     }
     
-    _loadStylesheet() {
-        let extensionPath = GLib.get_home_dir() + '/.local/share/gnome-shell/extensions/holikeyz-ring-light@example.com';
-        let stylesheetPath = extensionPath + '/stylesheet.css';
-        let stylesheetFile = Gio.File.new_for_path(stylesheetPath);
-        
-        if (stylesheetFile.query_exists(null)) {
-            let theme = St.ThemeContext.get_for_stage(global.stage).get_theme();
-            theme.load_stylesheet(stylesheetFile);
+    _connectToDbus() {
+        try {
+            this._dbusProxy = new HolikeyzDBusProxy(
+                Gio.DBus.session,
+                DBUS_NAME,
+                DBUS_PATH
+            );
+            
+            this._dbusProxy.connect('g-properties-changed', () => {
+                this._updateStatus();
+            });
+        } catch (e) {
+            log(`Failed to connect to D-Bus: ${e}`);
         }
     }
     
     _buildMenu() {
-        // Main container with custom styling
-        this.menu.box.add_style_class_name('elgato-menu');
+        // Clear existing menu
+        this.menu.removeAll();
         
-        // Header with power toggle
-        let header = new PopupMenu.PopupBaseMenuItem({ 
+        // Title
+        let title = new PopupMenu.PopupMenuItem('Ring Light Controller', { 
             reactive: false,
-            can_focus: false
+            can_focus: false 
         });
-        header.add_style_class_name('elgato-header');
+        title.label.add_style_class_name('ring-light-title');
+        this.menu.addMenuItem(title);
         
-        let headerBox = new St.BoxLayout({ 
-            vertical: false,
-            style_class: 'elgato-power-row'
-        });
-        
-        // Power icon
-        let powerIcon = new St.Icon({
-            icon_name: 'system-shutdown-symbolic',
-            style_class: 'elgato-power-icon'
-        });
-        headerBox.add_child(powerIcon);
-        
-        // Power switch
-        this._powerSwitch = new PopupMenu.Switch(false);
-        this._powerSwitch.connect('notify::state', () => {
-            this._toggleLight(this._powerSwitch.state);
-        });
-        headerBox.add_child(this._powerSwitch);
-        
-        // Light name
-        let lightLabel = new St.Label({ 
-            text: 'Ring Light',
-            y_align: Clutter.ActorAlign.CENTER,
-            style: 'font-weight: bold; font-size: 14px;'
-        });
-        headerBox.add_child(lightLabel);
-        
-        // Status label
-        this._statusLabel = new St.Label({
-            text: 'Connecting...',
-            style_class: 'elgato-status-label',
-            y_align: Clutter.ActorAlign.CENTER
-        });
-        headerBox.add_child(this._statusLabel);
-        
-        header.add_child(headerBox);
-        this.menu.addMenuItem(header);
-        
+        // Separator
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         
-        // Brightness control
-        let brightnessSection = new PopupMenu.PopupBaseMenuItem({ 
-            reactive: false,
-            can_focus: false
+        // Power toggle
+        this._powerSwitch = new PopupMenu.PopupSwitchMenuItem('Power', false);
+        this._powerSwitch.connect('toggled', (item) => {
+            this._togglePower(item.state);
         });
-        brightnessSection.add_style_class_name('elgato-control-section');
+        this.menu.addMenuItem(this._powerSwitch);
         
-        let brightnessBox = new St.BoxLayout({ 
-            vertical: false,
-            x_expand: true,
-            style_class: 'elgato-slider-row'
-        });
+        // Separator
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         
-        let brightnessIcon = new St.Icon({
-            icon_name: 'display-brightness-symbolic',
-            icon_size: 16
+        // Check number of lights and create controls
+        this._checkNumLights();
+    }
+    
+    _checkNumLights() {
+        if (!this._dbusProxy) return;
+        
+        this._dbusProxy.GetNumLightsRemote((result) => {
+            if (result && result[0]) {
+                this._numLights = result[0];
+                this._buildLightControls();
+            }
         });
-        brightnessBox.add_child(brightnessIcon);
+    }
+    
+    _buildLightControls() {
+        // Remove old light controls if any
+        this._lightItems.forEach(item => this.menu.box.remove_child(item));
+        this._lightItems = [];
+        
+        if (this._numLights > 1) {
+            // Multiple lights - show tabs or individual controls
+            this._buildMultiLightControls();
+        } else {
+            // Single light - show simple controls
+            this._buildSingleLightControls();
+        }
+        
+        // Add common items at the end
+        this._addCommonMenuItems();
+    }
+    
+    _buildSingleLightControls() {
+        // Brightness slider
+        let brightnessItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
+        let brightnessBox = new St.BoxLayout({ vertical: false, x_expand: true });
         
         let brightnessLabel = new St.Label({ 
             text: 'Brightness',
-            style_class: 'elgato-slider-label',
             y_align: Clutter.ActorAlign.CENTER 
         });
         brightnessBox.add_child(brightnessLabel);
         
         this._brightnessSlider = new Slider.Slider(0.5);
-        this._brightnessSlider.x_expand = true;
-        this._brightnessSlider.style = 'min-width: 150px;';
-        this._brightnessTimeout = null;
-        
-        this._brightnessSlider.connect('notify::value', (slider) => {
-            let brightness = Math.round(slider.value * 100);
-            this._brightnessValueLabel.text = `${brightness}%`;
-            
-            // Send immediately, but throttle rapid changes
-            if (!this._brightnessThrottled) {
-                this._setBrightness(brightness);
-                this._brightnessThrottled = true;
-                
-                // Allow next update after 50ms
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
-                    this._brightnessThrottled = false;
-                    // Send the latest value if it changed during throttle
-                    if (this._pendingBrightness !== undefined && this._pendingBrightness !== brightness) {
-                        this._setBrightness(this._pendingBrightness);
-                        this._pendingBrightness = undefined;
-                    }
-                    return GLib.SOURCE_REMOVE;
-                });
-            } else {
-                // Store pending value to send after throttle
-                this._pendingBrightness = brightness;
-            }
+        this._brightnessSlider.connect('notify::value', () => {
+            this._onBrightnessChanged();
         });
-        
         brightnessBox.add_child(this._brightnessSlider);
         
-        this._brightnessValueLabel = new St.Label({ 
+        this._brightnessValue = new St.Label({ 
             text: '50%',
-            style_class: 'elgato-slider-value',
             y_align: Clutter.ActorAlign.CENTER 
         });
-        brightnessBox.add_child(this._brightnessValueLabel);
+        brightnessBox.add_child(this._brightnessValue);
         
-        brightnessSection.add_child(brightnessBox);
-        this.menu.addMenuItem(brightnessSection);
+        brightnessItem.add_child(brightnessBox);
+        this.menu.addMenuItem(brightnessItem);
+        this._lightItems.push(brightnessItem);
         
-        // Temperature control
-        let temperatureSection = new PopupMenu.PopupBaseMenuItem({ 
-            reactive: false,
-            can_focus: false
-        });
-        temperatureSection.add_style_class_name('elgato-control-section');
+        // Temperature slider
+        let tempItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
+        let tempBox = new St.BoxLayout({ vertical: false, x_expand: true });
         
-        let temperatureBox = new St.BoxLayout({ 
-            vertical: false,
-            x_expand: true,
-            style_class: 'elgato-slider-row'
-        });
-        
-        let temperatureIcon = new St.Icon({
-            icon_name: 'preferences-color-symbolic',
-            icon_size: 16
-        });
-        temperatureBox.add_child(temperatureIcon);
-        
-        let temperatureLabel = new St.Label({ 
+        let tempLabel = new St.Label({ 
             text: 'Temperature',
-            style_class: 'elgato-slider-label',
             y_align: Clutter.ActorAlign.CENTER 
         });
-        temperatureBox.add_child(temperatureLabel);
+        tempBox.add_child(tempLabel);
         
-        this._temperatureSlider = new Slider.Slider(0.5);
-        this._temperatureSlider.x_expand = true;
-        this._temperatureSlider.style = 'min-width: 150px;';
-        this._temperatureTimeout = null;
-        
-        this._temperatureSlider.connect('notify::value', (slider) => {
-            let kelvin = Math.round(2900 + (slider.value * (7000 - 2900)));
-            this._temperatureValueLabel.text = `${kelvin}K`;
-            
-            // Send immediately, but throttle rapid changes
-            if (!this._temperatureThrottled) {
-                this._setTemperature(kelvin);
-                this._temperatureThrottled = true;
-                
-                // Allow next update after 50ms
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
-                    this._temperatureThrottled = false;
-                    // Send the latest value if it changed during throttle
-                    if (this._pendingTemperature !== undefined && this._pendingTemperature !== kelvin) {
-                        this._setTemperature(this._pendingTemperature);
-                        this._pendingTemperature = undefined;
-                    }
-                    return GLib.SOURCE_REMOVE;
-                });
-            } else {
-                // Store pending value to send after throttle
-                this._pendingTemperature = kelvin;
-            }
+        this._tempSlider = new Slider.Slider(0.5);
+        this._tempSlider.connect('notify::value', () => {
+            this._onTemperatureChanged();
         });
+        tempBox.add_child(this._tempSlider);
         
-        temperatureBox.add_child(this._temperatureSlider);
-        
-        this._temperatureValueLabel = new St.Label({ 
+        this._tempValue = new St.Label({ 
             text: '4500K',
-            style_class: 'elgato-slider-value',
             y_align: Clutter.ActorAlign.CENTER 
         });
-        temperatureBox.add_child(this._temperatureValueLabel);
+        tempBox.add_child(this._tempValue);
         
-        temperatureSection.add_child(temperatureBox);
-        this.menu.addMenuItem(temperatureSection);
-        
-        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-        
-        // Scenes section
-        this._buildScenesGrid();
-        
-        // Quick actions
-        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-        
-        let actionsBox = new St.BoxLayout({
-            vertical: false,
-            style_class: 'elgato-quick-actions'
-        });
-        
-        let identifyButton = new St.Button({
-            label: 'Identify',
-            style_class: 'elgato-action-button',
-            x_expand: true
-        });
-        identifyButton.connect('clicked', () => {
-            this._identifyLight();
-        });
-        actionsBox.add_child(identifyButton);
-        
-        let settingsButton = new St.Button({
-            label: 'Settings',
-            style_class: 'elgato-action-button',
-            x_expand: true
-        });
-        settingsButton.connect('clicked', () => {
-            // TODO: Open settings dialog
-            log('Settings clicked');
-        });
-        actionsBox.add_child(settingsButton);
-        
-        let actionsItem = new PopupMenu.PopupBaseMenuItem({ 
-            reactive: false,
-            can_focus: false
-        });
-        actionsItem.add_child(actionsBox);
-        this.menu.addMenuItem(actionsItem);
+        tempItem.add_child(tempBox);
+        this.menu.addMenuItem(tempItem);
+        this._lightItems.push(tempItem);
     }
     
-    _buildScenesGrid() {
-        // Title
-        let titleItem = new PopupMenu.PopupBaseMenuItem({ 
+    _buildMultiLightControls() {
+        // Header for multi-light control
+        let headerItem = new PopupMenu.PopupMenuItem(`${this._numLights} Lights Detected`, { 
             reactive: false,
-            can_focus: false
+            can_focus: false 
         });
-        let titleLabel = new St.Label({
-            text: 'Scenes',
-            style_class: 'elgato-scenes-title'
-        });
-        titleItem.add_child(titleLabel);
-        this.menu.addMenuItem(titleItem);
+        this.menu.addMenuItem(headerItem);
+        this._lightItems.push(headerItem);
         
-        // Scene grid container
-        let scenesContainer = new PopupMenu.PopupBaseMenuItem({ 
+        // Master controls for all lights
+        let masterSection = new PopupMenu.PopupMenuSection();
+        let masterLabel = new PopupMenu.PopupMenuItem('All Lights', { 
             reactive: false,
-            can_focus: false
+            can_focus: false 
         });
-        scenesContainer.add_style_class_name('elgato-scenes-section');
+        masterSection.addMenuItem(masterLabel);
         
-        let scenesGrid = new St.BoxLayout({
-            vertical: true,
-            style_class: 'elgato-scenes-grid'
+        // Master brightness
+        let brightnessItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
+        let brightnessBox = new St.BoxLayout({ vertical: false, x_expand: true });
+        
+        let brightnessLabel = new St.Label({ 
+            text: 'Brightness',
+            y_align: Clutter.ActorAlign.CENTER 
+        });
+        brightnessBox.add_child(brightnessLabel);
+        
+        this._brightnessSlider = new Slider.Slider(0.5);
+        this._brightnessSlider.connect('notify::value', () => {
+            this._onBrightnessChanged();
+        });
+        brightnessBox.add_child(this._brightnessSlider);
+        
+        this._brightnessValue = new St.Label({ 
+            text: '50%',
+            y_align: Clutter.ActorAlign.CENTER 
+        });
+        brightnessBox.add_child(this._brightnessValue);
+        
+        brightnessItem.add_child(brightnessBox);
+        masterSection.addMenuItem(brightnessItem);
+        
+        // Master temperature
+        let tempItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
+        let tempBox = new St.BoxLayout({ vertical: false, x_expand: true });
+        
+        let tempLabel = new St.Label({ 
+            text: 'Temperature',
+            y_align: Clutter.ActorAlign.CENTER 
+        });
+        tempBox.add_child(tempLabel);
+        
+        this._tempSlider = new Slider.Slider(0.5);
+        this._tempSlider.connect('notify::value', () => {
+            this._onTemperatureChanged();
+        });
+        tempBox.add_child(this._tempSlider);
+        
+        this._tempValue = new St.Label({ 
+            text: '4500K',
+            y_align: Clutter.ActorAlign.CENTER 
+        });
+        tempBox.add_child(this._tempValue);
+        
+        tempItem.add_child(tempBox);
+        masterSection.addMenuItem(tempItem);
+        
+        this.menu.addMenuItem(masterSection);
+        this._lightItems.push(masterSection);
+        
+        // Separator
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        
+        // Individual light toggles
+        let individualSection = new PopupMenu.PopupMenuSection();
+        let individualLabel = new PopupMenu.PopupMenuItem('Individual Lights', { 
+            reactive: false,
+            can_focus: false 
+        });
+        individualSection.addMenuItem(individualLabel);
+        
+        for (let i = 0; i < this._numLights; i++) {
+            let lightSwitch = new PopupMenu.PopupSwitchMenuItem(`Light ${i + 1}`, false);
+            lightSwitch.connect('toggled', (item) => {
+                this._toggleLight(i, item.state);
+            });
+            individualSection.addMenuItem(lightSwitch);
+            
+            // Store reference for updating
+            if (!this._individualLightSwitches) {
+                this._individualLightSwitches = [];
+            }
+            this._individualLightSwitches[i] = lightSwitch;
+        }
+        
+        this.menu.addMenuItem(individualSection);
+        this._lightItems.push(individualSection);
+    }
+    
+    _addCommonMenuItems() {
+        // Separator before scenes
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        
+        // Scene presets
+        let sceneLabel = new PopupMenu.PopupMenuItem('Scene Presets', { 
+            reactive: false,
+            can_focus: false 
+        });
+        this.menu.addMenuItem(sceneLabel);
+        
+        this._sceneButtons = {};
+        let sceneBox = new St.BoxLayout({ 
+            vertical: false, 
+            x_expand: true,
+            style: 'spacing: 6px; padding: 10px;'
         });
         
-        // Create scene buttons in a 2-column grid
-        for (let i = 0; i < SCENES.length; i += 2) {
-            let row = new St.BoxLayout({
-                vertical: false,
-                style_class: 'elgato-scene-row'
+        SCENE_PRESETS.forEach(scene => {
+            let button = new St.Button({
+                label: scene.icon,
+                style_class: 'scene-button',
+                x_expand: false,
+                can_focus: true,
+                track_hover: true
             });
             
-            // Add two scenes per row
-            for (let j = i; j < Math.min(i + 2, SCENES.length); j++) {
-                let scene = SCENES[j];
-                let button = this._createSceneButton(scene);
-                this._sceneButtons.set(scene.id, button);
-                row.add_child(button);
+            button.connect('clicked', () => {
+                this._applyScene(scene);
+            });
+            
+            this._sceneButtons[scene.id] = button;
+            sceneBox.add_child(button);
+        });
+        
+        let sceneItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
+        sceneItem.add_child(sceneBox);
+        this.menu.addMenuItem(sceneItem);
+        
+        // Separator
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        
+        // Settings section
+        let settingsSection = new PopupMenu.PopupSubMenuMenuItem('Settings', true);
+        
+        // Power-on behavior
+        let powerOnItem = new PopupMenu.PopupMenuItem('Power-On Behavior');
+        powerOnItem.connect('activate', () => {
+            this._showPowerOnSettings();
+        });
+        settingsSection.menu.addMenuItem(powerOnItem);
+        
+        // Device info
+        let infoItem = new PopupMenu.PopupMenuItem('Device Info');
+        infoItem.connect('activate', () => {
+            this._showDeviceInfo();
+        });
+        settingsSection.menu.addMenuItem(infoItem);
+        
+        // Identify
+        let identifyItem = new PopupMenu.PopupMenuItem('Identify Light');
+        identifyItem.connect('activate', () => {
+            this._identifyLight();
+        });
+        settingsSection.menu.addMenuItem(identifyItem);
+        
+        this.menu.addMenuItem(settingsSection);
+    }
+    
+    _onBrightnessChanged() {
+        if (this._ignoreSliderUpdate) return;
+        
+        let brightness = Math.round(this._brightnessSlider.value * 100);
+        this._brightnessValue.text = `${brightness}%`;
+        
+        // Debounce the D-Bus call
+        if (this._sliderUpdateTimeout) {
+            GLib.source_remove(this._sliderUpdateTimeout);
+        }
+        
+        this._sliderUpdateTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
+            if (this._dbusProxy) {
+                this._dbusProxy.SetBrightnessRemote(brightness, (result) => {
+                    if (result && result[0]) {
+                        this._updateSceneButtons(null);
+                    }
+                });
             }
-            
-            scenesGrid.add_child(row);
+            this._sliderUpdateTimeout = null;
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+    
+    _onTemperatureChanged() {
+        if (this._ignoreSliderUpdate) return;
+        
+        let temp = Math.round(2900 + (this._tempSlider.value * 4100));
+        this._tempValue.text = `${temp}K`;
+        
+        // Debounce the D-Bus call
+        if (this._sliderUpdateTimeout) {
+            GLib.source_remove(this._sliderUpdateTimeout);
         }
         
-        scenesContainer.add_child(scenesGrid);
-        this.menu.addMenuItem(scenesContainer);
+        this._sliderUpdateTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
+            if (this._dbusProxy) {
+                this._dbusProxy.SetTemperatureRemote(temp, (result) => {
+                    if (result && result[0]) {
+                        this._updateSceneButtons(null);
+                    }
+                });
+            }
+            this._sliderUpdateTimeout = null;
+            return GLib.SOURCE_REMOVE;
+        });
     }
     
-    _createSceneButton(scene) {
-        let button = new St.Button({
-            style_class: 'elgato-scene-button',
-            can_focus: true
-        });
+    _togglePower(state) {
+        if (!this._dbusProxy) return;
         
-        // Scene content with background
-        let content = new St.BoxLayout({
-            vertical: true,
-            style_class: 'elgato-scene-content',
-            style: this._getSceneBackgroundStyle(scene)
-        });
-        
-        // Overlay for text
-        let overlay = new St.BoxLayout({
-            vertical: true,
-            style_class: 'elgato-scene-overlay'
-        });
-        
-        // Spacer to push text to bottom
-        overlay.add_child(new St.Widget({ y_expand: true }));
-        
-        // Scene info
-        let info = new St.BoxLayout({
-            vertical: true,
-            style_class: 'elgato-scene-info'
-        });
-        
-        let nameLabel = new St.Label({
-            text: scene.name,
-            style_class: 'elgato-scene-name'
-        });
-        info.add_child(nameLabel);
-        
-        let descLabel = new St.Label({
-            text: scene.description,
-            style_class: 'elgato-scene-description'
-        });
-        info.add_child(descLabel);
-        
-        overlay.add_child(info);
-        content.add_child(overlay);
-        button.set_child(content);
-        
-        // Connect click handler
-        button.connect('clicked', () => {
-            // Immediate visual feedback
-            this._updateSceneButtons(scene.id);
-            
-            // Update sliders immediately to match scene
-            this._brightnessSlider.value = scene.brightness / 100;
-            this._brightnessValueLabel.text = `${scene.brightness}%`;
-            let tempNorm = (scene.temperature - 2900) / (7000 - 2900);
-            this._temperatureSlider.value = tempNorm;
-            this._temperatureValueLabel.text = `${scene.temperature}K`;
-            
-            // Apply the scene
-            this._applyScene(scene.id);
-        });
-        
-        return button;
-    }
-    
-    _getSceneBackgroundStyle(scene) {
-        // Check if image exists
-        let extensionPath = GLib.get_home_dir() + '/.local/share/gnome-shell/extensions/holikeyz-ring-light@example.com';
-        let imagePath = `${extensionPath}/images/${scene.id}.jpg`;
-        let imageFile = Gio.File.new_for_path(imagePath);
-        
-        if (imageFile.query_exists(null)) {
-            return `background-image: url("file://${imagePath}");`;
+        if (state) {
+            this._dbusProxy.TurnOnRemote((result) => {
+                if (result && result[0]) {
+                    this._updateStatus();
+                }
+            });
         } else {
-            // Fallback to gradient
-            return this._getSceneGradient(scene);
+            this._dbusProxy.TurnOffRemote((result) => {
+                if (result && result[0]) {
+                    this._updateStatus();
+                }
+            });
         }
     }
     
-    _getSceneGradient(scene) {
-        switch(scene.id) {
-            case 'daylight':
-                return 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);';
-            case 'warm':
-                return 'background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);';
-            case 'cool':
-                return 'background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);';
-            case 'reading':
-                return 'background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);';
-            case 'video':
-                return 'background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);';
-            case 'relax':
-                return 'background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);';
-            default:
-                return 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);';
+    _toggleLight(index, state) {
+        if (!this._dbusProxy) return;
+        
+        if (state) {
+            this._dbusProxy.TurnOnLightRemote(index, (result) => {
+                if (result && result[0]) {
+                    this._updateStatus();
+                }
+            });
+        } else {
+            this._dbusProxy.TurnOffLightRemote(index, (result) => {
+                if (result && result[0]) {
+                    this._updateStatus();
+                }
+            });
         }
+    }
+    
+    _applyScene(scene) {
+        if (!this._dbusProxy) return;
+        
+        this._dbusProxy.ApplySceneRemote(scene.id, (result) => {
+            if (result && result[0]) {
+                this._currentScene = scene.id;
+                this._updateSceneButtons(scene.id);
+                
+                // Update sliders immediately to match scene
+                this._ignoreSliderUpdate = true;
+                this._brightnessSlider.value = scene.brightness / 100;
+                this._brightnessValue.text = `${scene.brightness}%`;
+                this._tempSlider.value = (scene.temperature - 2900) / 4100;
+                this._tempValue.text = `${scene.temperature}K`;
+                this._ignoreSliderUpdate = false;
+                
+                this._updateStatus();
+            }
+        });
     }
     
     _updateSceneButtons(activeSceneId) {
-        this._currentScene = activeSceneId;
-        this._sceneButtons.forEach((button, sceneId) => {
+        Object.keys(this._sceneButtons).forEach(sceneId => {
+            let button = this._sceneButtons[sceneId];
             if (sceneId === activeSceneId) {
-                button.add_style_class_name('active');
+                button.add_style_class_name('scene-button-active');
             } else {
-                button.remove_style_class_name('active');
+                button.remove_style_class_name('scene-button-active');
             }
         });
     }
     
-    _connectToDBus() {
-        try {
-            this._proxy = new HolikeyzDBusProxy(
-                Gio.DBus.session,
-                DBUS_NAME,
-                DBUS_PATH,
-                (proxy, error) => {
-                    if (error) {
-                        log(`Failed to connect to Holikeyz D-Bus service: ${error}`);
-                        this._setConnectionStatus(false);
-                    } else {
-                        this._setConnectionStatus(true);
-                        this._updateStatus();
-                    }
-                }
-            );
-        } catch (e) {
-            log(`Error creating D-Bus proxy: ${e}`);
-            this._setConnectionStatus(false);
-        }
-    }
-    
-    _setConnectionStatus(connected) {
-        this._isConnected = connected;
-        if (connected) {
-            this._statusLabel.text = 'Connected';
-            this._statusLabel.remove_style_class_name('elgato-connecting');
-            this._icon.icon_name = 'weather-clear-symbolic';
-            this._powerSwitch.reactive = true;
-            this._brightnessSlider.reactive = true;
-            this._temperatureSlider.reactive = true;
-        } else {
-            this._statusLabel.text = 'Disconnected';
-            this._statusLabel.add_style_class_name('elgato-connecting');
-            this._icon.icon_name = 'dialog-error-symbolic';
-            this._powerSwitch.reactive = false;
-            this._brightnessSlider.reactive = false;
-            this._temperatureSlider.reactive = false;
-        }
-    }
-    
-    _updateStatus() {
-        if (!this._isConnected || !this._proxy) return;
+    _showPowerOnSettings() {
+        if (!this._dbusProxy) return;
         
-        this._proxy.GetStatusRemote((result, error) => {
-            if (error) {
-                log(`Failed to get status: ${error}`);
-                return;
-            }
-            
-            let [is_on, brightness, temperature] = result;
-            this._isOn = is_on;
-            this._brightness = brightness;
-            this._temperature = temperature;
-            
-            this._powerSwitch.state = is_on;
-            this._brightnessSlider.value = brightness / 100;
-            this._brightnessValueLabel.text = `${brightness}%`;
-            
-            let tempNorm = (temperature - 2900) / (7000 - 2900);
-            this._temperatureSlider.value = tempNorm;
-            this._temperatureValueLabel.text = `${temperature}K`;
-            
-            if (is_on) {
-                this._icon.icon_name = 'weather-clear-symbolic';
-                this._statusLabel.text = 'On';
-            } else {
-                this._icon.icon_name = 'weather-clear-night-symbolic';
-                this._statusLabel.text = 'Off';
-            }
-            
-            // Check if current state matches a scene
-            this._detectCurrentScene(brightness, temperature);
-        });
-    }
-    
-    _detectCurrentScene(brightness, temperature) {
-        for (let scene of SCENES) {
-            if (Math.abs(scene.brightness - brightness) < 5 && 
-                Math.abs(scene.temperature - temperature) < 200) {
-                this._updateSceneButtons(scene.id);
-                return;
-            }
-        }
-        // No matching scene
-        this._updateSceneButtons(null);
-    }
-    
-    _toggleLight(state) {
-        if (!this._isConnected || !this._proxy) return;
-        
-        let method = state ? 'TurnOnRemote' : 'TurnOffRemote';
-        this._proxy[method]((result, error) => {
-            if (error) {
-                log(`Failed to toggle light: ${error}`);
-            } else {
-                this._updateStatus();
+        this._dbusProxy.GetSettingsRemote((result) => {
+            if (result) {
+                let [behavior, brightness, temperature] = result;
+                
+                // Create dialog to edit settings
+                let dialog = new PopupMenu.PopupMenuSection();
+                
+                let behaviorItem = new PopupMenu.PopupMenuItem(
+                    `Power-On: ${behavior === 1 ? 'Last State' : 'Default'}`
+                );
+                behaviorItem.connect('activate', () => {
+                    // Toggle behavior
+                    let newBehavior = behavior === 1 ? 0 : 1;
+                    this._dbusProxy.SetPowerOnSettingsRemote(
+                        newBehavior, brightness, temperature,
+                        (result) => {
+                            if (result && result[0]) {
+                                Main.notify('Ring Light', 'Power-on settings updated');
+                            }
+                        }
+                    );
+                });
+                
+                dialog.addMenuItem(behaviorItem);
+                // Could add more UI for brightness/temperature settings
             }
         });
     }
     
-    _setBrightness(brightness) {
-        if (!this._isConnected || !this._proxy) {
-            return;
-        }
+    _showDeviceInfo() {
+        if (!this._dbusProxy) return;
         
-        this._proxy.SetBrightnessRemote(brightness, (result, error) => {
-            if (error) {
-                log(`Failed to set brightness: ${error}`);
-            }
-        });
-    }
-    
-    _setTemperature(kelvin) {
-        if (!this._isConnected || !this._proxy) return;
-        
-        this._proxy.SetTemperatureRemote(kelvin, (result, error) => {
-            if (error) {
-                log(`Failed to set temperature: ${error}`);
-            }
-        });
-    }
-    
-    _applyScene(sceneId) {
-        if (!this._isConnected || !this._proxy) return;
-        
-        this._proxy.ApplySceneRemote(sceneId, (result, error) => {
-            if (error) {
-                log(`Failed to apply scene: ${error}`);
-            } else {
-                this._updateStatus();
+        this._dbusProxy.GetAccessoryInfoRemote((result) => {
+            if (result) {
+                let [productName, firmwareVersion, serialNumber, firmwareBuild, displayName, features] = result;
+                
+                let message = `Product: ${productName}\n` +
+                            `Name: ${displayName}\n` +
+                            `Firmware: ${firmwareVersion} (build ${firmwareBuild})\n` +
+                            `Serial: ${serialNumber}\n` +
+                            `Features: ${features.join(', ')}`;
+                
+                Main.notify('Ring Light Info', message);
             }
         });
     }
     
     _identifyLight() {
-        if (!this._isConnected || !this._proxy) return;
+        if (!this._dbusProxy) return;
         
-        this._proxy.IdentifyRemote((result, error) => {
-            if (error) {
-                log(`Failed to identify light: ${error}`);
+        this._dbusProxy.IdentifyRemote((result) => {
+            if (result && result[0]) {
+                Main.notify('Ring Light', 'Light should be flashing');
             }
         });
     }
     
-    _onDestroy() {
-        this._proxy = null;
+    _updateStatus() {
+        if (!this._dbusProxy) return;
+        
+        // Update status for backward compatibility with single light
+        this._dbusProxy.GetStatusRemote((result) => {
+            if (result) {
+                let [isOn, brightness, temperature] = result;
+                this._isOn = isOn;
+                this._brightness = brightness;
+                this._temperature = temperature;
+                
+                // Update UI
+                this._powerSwitch.setToggleState(isOn);
+                this._icon.icon_name = isOn ? 'dialog-information-symbolic' : 'dialog-information-symbolic';
+                
+                // Update sliders without triggering callbacks
+                this._ignoreSliderUpdate = true;
+                if (this._brightnessSlider) {
+                    this._brightnessSlider.value = brightness / 100;
+                    this._brightnessValue.text = `${brightness}%`;
+                }
+                if (this._tempSlider) {
+                    this._tempSlider.value = (temperature - 2900) / 4100;
+                    this._tempValue.text = `${temperature}K`;
+                }
+                this._ignoreSliderUpdate = false;
+                
+                // Check which scene matches current settings
+                let matchingScene = SCENE_PRESETS.find(scene => 
+                    Math.abs(scene.brightness - brightness) < 5 &&
+                    Math.abs(scene.temperature - temperature) < 200
+                );
+                this._updateSceneButtons(matchingScene ? matchingScene.id : null);
+            }
+        });
+        
+        // If we have multiple lights, update their individual states
+        if (this._numLights > 1 && this._individualLightSwitches) {
+            this._dbusProxy.GetAllLightsStatusRemote((result) => {
+                if (result) {
+                    let [isOnArray, brightnessArray, temperatureArray] = result;
+                    
+                    for (let i = 0; i < Math.min(isOnArray.length, this._individualLightSwitches.length); i++) {
+                        this._individualLightSwitches[i].setToggleState(isOnArray[i]);
+                    }
+                }
+            });
+        }
+    }
+    
+    destroy() {
+        if (this._sliderUpdateTimeout) {
+            GLib.source_remove(this._sliderUpdateTimeout);
+            this._sliderUpdateTimeout = null;
+        }
+        
+        super.destroy();
     }
 });
 
-export default class HolikeyzExtension {
-    constructor() {
-        this._indicator = null;
+// Extension entry points
+let ringLightIndicator;
+
+export default class RingLightExtension {
+    constructor(uuid) {
+        this._uuid = uuid;
     }
     
     enable() {
-        this._indicator = new HolikeyzIndicator();
-        Main.panel.addToStatusArea('holikeyz-indicator', this._indicator);
+        ringLightIndicator = new RingLightIndicator();
+        Main.panel.addToStatusArea(this._uuid, ringLightIndicator);
     }
     
     disable() {
-        if (this._indicator) {
-            this._indicator.destroy();
-            this._indicator = null;
+        if (ringLightIndicator) {
+            ringLightIndicator.destroy();
+            ringLightIndicator = null;
         }
     }
 }
