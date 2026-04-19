@@ -2,7 +2,13 @@
 
 An unofficial, open-source Ring Light controller for Linux with GNOME integration. Control your ring light with a beautiful Philips Hue-inspired interface directly from your GNOME desktop.
 
-**Note:** This is an independent project and is not affiliated with, endorsed by, or associated with Elgato or Corsair in any way.
+## Legal & Reverse-Engineering Notice
+
+This is an **independent, unofficial** project. It is **not affiliated with, endorsed by, sponsored by, or associated with Elgato, Corsair, or any of their subsidiaries**. All product names, trademarks, and registered trademarks are property of their respective owners; references to "Elgato" are used solely to describe device compatibility.
+
+The device-side protocol constants and wire format used in `src/provisioning/` were derived by black-box interoperability analysis of a device the author lawfully owns, for the purpose of enabling that device to operate with non-vendor software. No vendor firmware, SDKs, or proprietary source code were decompiled, redistributed, or used in producing this project.
+
+This project is provided **"AS IS"**, under the MIT license, for personal, educational, and interoperability use. Use on networks or devices you do not own or have explicit permission to operate may violate local law — you are responsible for how you use it.
 
 ## Features
 

@@ -232,6 +232,9 @@ impl SoftAPManager {
     }
 
     fn generate_hostapd_config(&self) -> Result<String> {
+        validate_hostapd_value(&self.config.interface, "interface", 32)?;
+        validate_ssid(&self.config.ssid)?;
+
         let mut config = format!(
             r#"interface={}
 driver=nl80211
@@ -248,9 +251,7 @@ ignore_broadcast_ssid=0
         );
 
         if let Some(password) = &self.config.password {
-            if password.len() < 8 {
-                anyhow::bail!("WiFi password must be at least 8 characters");
-            }
+            validate_wpa_passphrase(password)?;
             config.push_str(&format!(
                 r#"wpa=2
 wpa_passphrase={}
@@ -284,6 +285,43 @@ log-dhcp
             self.config.ip_address
         )
     }
+}
+
+fn contains_control_chars(s: &str) -> bool {
+    s.bytes().any(|b| b == b'\n' || b == b'\r' || b == 0)
+}
+
+fn validate_hostapd_value(value: &str, field: &str, max_len: usize) -> Result<()> {
+    if value.is_empty() {
+        anyhow::bail!("{} must not be empty", field);
+    }
+    if value.len() > max_len {
+        anyhow::bail!("{} too long ({} bytes, max {})", field, value.len(), max_len);
+    }
+    if contains_control_chars(value) {
+        anyhow::bail!("{} contains illegal control characters", field);
+    }
+    Ok(())
+}
+
+fn validate_ssid(ssid: &str) -> Result<()> {
+    if ssid.is_empty() || ssid.as_bytes().len() > 32 {
+        anyhow::bail!("SSID must be 1-32 bytes");
+    }
+    if contains_control_chars(ssid) {
+        anyhow::bail!("SSID contains illegal control characters");
+    }
+    Ok(())
+}
+
+fn validate_wpa_passphrase(pass: &str) -> Result<()> {
+    if pass.len() < 8 || pass.len() > 63 {
+        anyhow::bail!("WPA passphrase must be 8-63 characters");
+    }
+    if contains_control_chars(pass) {
+        anyhow::bail!("WPA passphrase contains illegal control characters");
+    }
+    Ok(())
 }
 
 pub async fn is_soft_ap_capable() -> Result<bool> {

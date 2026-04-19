@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 use tokio::time::sleep;
-use rand::{Rng, RngCore};
+use rand::{RngCore, rngs::OsRng};
 
 use crate::provisioning::{
     DeviceInfo, WiFiNetwork, WiFiCredentials, ProvisioningRequest, 
@@ -212,10 +212,9 @@ impl ElgatoProvisioner {
         let padding_len = 16 - (json_bytes.len() % 16);
         json_bytes.extend(vec![padding_len as u8; padding_len]);
         
-        // Add 16-byte random prefix
-        let mut rng = rand::thread_rng();
+        // Add 16-byte random prefix — use OS CSPRNG for crypto material
         let mut random_prefix = vec![0u8; 16];
-        rng.fill_bytes(&mut random_prefix);
+        OsRng.fill_bytes(&mut random_prefix);
         
         // Combine random prefix with JSON data
         let mut data_to_encrypt = random_prefix;
@@ -259,9 +258,7 @@ impl ElgatoProvisioner {
         // Get device info for encryption key
         let device_info = self.get_device_info().await?;
         let encryption_key = self.generate_encryption_key(&device_info);
-        
-        debug!("Using encryption key: {}", encryption_key);
-        
+
         // Encrypt credentials
         let encrypted_data = self.encrypt_wifi_credentials(credentials, &encryption_key)?;
         

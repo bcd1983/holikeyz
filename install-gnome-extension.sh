@@ -27,7 +27,21 @@ cp systemd/holikeyz-ring-light.service ~/.config/systemd/user/
 # Update the IP address in the service file
 read -p "Enter your Ring Light IP address [192.168.7.80]: " ip_address
 ip_address=${ip_address:-192.168.7.80}
-sed -i "s/RING_LIGHT_IP=.*/RING_LIGHT_IP=$ip_address/" ~/.config/systemd/user/holikeyz-ring-light.service
+
+# Validate IPv4 format before substitution to prevent sed injection
+if ! [[ "$ip_address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    echo "Error: '$ip_address' is not a valid IPv4 address" >&2
+    exit 1
+fi
+IFS='.' read -r a b c d <<< "$ip_address"
+for octet in "$a" "$b" "$c" "$d"; do
+    if (( octet > 255 )); then
+        echo "Error: '$ip_address' is not a valid IPv4 address" >&2
+        exit 1
+    fi
+done
+
+sed -i "s|RING_LIGHT_IP=.*|RING_LIGHT_IP=${ip_address}|" ~/.config/systemd/user/holikeyz-ring-light.service
 
 # Install GNOME extension
 echo "Installing GNOME Shell extension..."

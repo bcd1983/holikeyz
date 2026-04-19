@@ -247,10 +247,12 @@ pub async fn start_provisioning_server(port: u16) -> Result<()> {
     let api = Arc::new(ProvisioningAPI::new());
     let routes = api.routes();
 
-    info!("Starting provisioning API server on port {}", port);
+    // Bind to localhost only — the provisioning API has no auth, so it must
+    // never be exposed on an external interface.
+    info!("Starting provisioning API server on 127.0.0.1:{}", port);
 
     warp::serve(routes)
-        .run(([0, 0, 0, 0], port))
+        .run(([127, 0, 0, 1], port))
         .await;
 
     Ok(())
